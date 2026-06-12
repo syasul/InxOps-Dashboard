@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\SubdomainController;
+use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\Api\MetricsController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::resource('subdomains', SubdomainController::class)->only(['index', 'store', 'destroy']);
 
     Route::get('/api/metrics', [MetricsController::class, 'index'])->name('api.metrics');
+
+    Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
+    Route::post('/terminal/execute', [TerminalController::class, 'execute'])->name('terminal.execute');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

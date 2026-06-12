@@ -50,6 +50,9 @@
                     <x-nav-link-custom :href="route('subdomains.index')" :active="request()->routeIs('subdomains.*')" icon="subdomains">
                         Global Network
                     </x-nav-link-custom>
+                    <x-nav-link-custom :href="route('terminal.index')" :active="request()->routeIs('terminal.*')" icon="terminal">
+                        Secure Terminal
+                    </x-nav-link-custom>
                 </div>
 
                 <!-- Footer / Profile -->
