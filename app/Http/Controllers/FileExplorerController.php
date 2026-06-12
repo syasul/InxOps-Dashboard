@@ -10,18 +10,27 @@ use Symfony\Component\HttpFoundation\File\Exception\FileException;
 class FileExplorerController extends Controller
 {
     protected $basePath;
-
     public function __construct()
     {
-        // Use custom path from .env, or fallback to a dedicated folder outside the project
-        $this->basePath = env('STORAGE_EXPLORER_PATH', base_path('../InxOps-Storage'));
+        // Dynamically resolve Home directory (compatible with Mac and Linux)
+        $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+        $defaultPath = $home . '/webapps/InxOps-Storage';
         
-        // Ensure the absolute path is resolved
-        if (!File::exists($this->basePath)) {
-            File::makeDirectory($this->basePath, 0755, true);
+        $this->basePath = env('STORAGE_EXPLORER_PATH', $defaultPath);
+        
+        try {
+            if (!File::exists($this->basePath)) {
+                File::makeDirectory($this->basePath, 0775, true);
+            }
+            $this->basePath = realpath($this->basePath);
+        } catch (\Exception $e) {
+            // Ultimate fallback to internal storage
+            $this->basePath = storage_path('app/explorer');
+            if (!File::exists($this->basePath)) {
+                File::makeDirectory($this->basePath, 0775, true);
+            }
+            $this->basePath = realpath($this->basePath);
         }
-        
-        $this->basePath = realpath($this->basePath);
     }
 
     public function index(Request $request)
