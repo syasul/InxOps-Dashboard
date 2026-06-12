@@ -68,6 +68,18 @@ class ProjectController extends Controller
         return back()->with('success', 'Deployment started.');
     }
 
+    public function pull(Project $project)
+    {
+        $process = new \Symfony\Component\Process\Process(['git', 'pull', 'origin', $project->branch], $project->directory_path);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            return back()->with('success', 'Code successfully synchronized via Git Pull.');
+        }
+
+        return back()->with('error', 'Pull failed: ' . $process->getErrorOutput());
+    }
+
     public function destroy(Project $project)
     {
         $project->delete();

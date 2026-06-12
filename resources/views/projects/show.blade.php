@@ -19,11 +19,19 @@
             </div>
             
             <div class="flex items-center gap-3">
+                <form action="{{ route('projects.pull', $project) }}" method="POST">
+                    @csrf
+                    <button type="submit" class="px-6 py-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-xs font-black text-slate-300 uppercase tracking-widest transition-all flex items-center gap-2 group">
+                        <svg class="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Sync & Pull
+                    </button>
+                </form>
+
                 <form action="{{ route('projects.deploy', $project) }}" method="POST">
                     @csrf
                     <button type="submit" class="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/20 active:scale-95 flex items-center gap-2 group">
-                        <svg class="w-4 h-4 group-hover:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Deploy Now
+                        <svg class="w-4 h-4 group-hover:animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Build Now
                     </button>
                 </form>
             </div>

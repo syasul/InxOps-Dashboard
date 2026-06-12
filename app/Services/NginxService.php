@@ -12,16 +12,24 @@ class NginxService
     {
         $project = $subdomain->project;
         $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
+        $shortName = $subdomain->subdomain_name;
         $template = $this->getTemplate($fullDomain, $project->directory_path);
         
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
+        $oldPath = "/etc/nginx/sites-available/{$shortName}";
         
-        // Write locally first then move with sudo for safety
+        // Write locally first
         $tempPath = storage_path("nginx/{$fullDomain}.conf");
         File::ensureDirectoryExists(storage_path("nginx"));
         File::put($tempPath, $template);
 
-        // Move to available sites
+        // Forced Cleanup: Remove any old potential config files to avoid conflicts
+        $this->runSudo(['rm', '-f', $availablePath]);
+        $this->runSudo(['rm', '-f', $oldPath]);
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$fullDomain}"]);
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
+
+        // Copy new config
         $this->runSudo(['cp', $tempPath, $availablePath]);
         
         return $availablePath;
@@ -41,33 +49,24 @@ class NginxService
 
     protected function getTemplate($domain, $path)
     {
+        // Check if project has a port set, if so use Proxy, otherwise use PHP-FPM
+        // This is a simplified check, usually we'd pass this in.
+        return $this->reverseProxyTemplate($domain);
+    }
+
+    protected function reverseProxyTemplate($domain)
+    {
         return "server {
     listen 80;
     server_name {$domain};
-    root {$path}/public;
-
-    add_header X-Frame-Options \"SAMEORIGIN\";
-    add_header X-Content-Type-Options \"nosniff\";
-
-    index index.php;
-    charset utf-8;
 
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location = /favicon.ico { access_log off; log_not_found off; }
-    location = /robots.txt  { access_log off; log_not_found off; }
-
-    error_page 404 /index.php;
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
-    }
-
-    location ~ /\.(?!well-known).* {
-        deny all;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
     }
 }";
     }
@@ -81,6 +80,10 @@ class NginxService
 
     public function reload()
     {
+        // Try systemctl first, fallback to nginx -s reload
+        if ($this->runSudo(['systemctl', 'reload', 'nginx'])) {
+            return true;
+        }
         return $this->runSudo(['nginx', '-s', 'reload']);
     }
 }

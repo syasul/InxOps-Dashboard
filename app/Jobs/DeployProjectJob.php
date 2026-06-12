@@ -26,18 +26,43 @@ class DeployProjectJob implements ShouldQueue
     {
         $this->deployment->update(['status' => 'running']);
         $logOutput = "";
-
-        $commands = [
-            ['git', 'pull', 'origin', $this->project->branch],
-            ['composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader'],
-            ['npm', 'install'],
-            ['npm', 'run', 'build'],
-            ['php', 'artisan', 'migrate', '--force'],
-        ];
+        $path = $this->project->directory_path;
 
         try {
+            // 1. Check if we need to clone the repository
+            if (!\Illuminate\Support\Facades\File::exists($path . '/.git')) {
+                $logOutput .= "> Initializing fresh clone...\n";
+                // Ensure parent directory exists
+                \Illuminate\Support\Facades\File::ensureDirectoryExists(dirname($path), 0755, true);
+                
+                $cloneProcess = new Process(['git', 'clone', '-b', $this->project->branch, $this->project->repo_url, $path]);
+                $cloneProcess->setTimeout(600);
+                $cloneProcess->run();
+                
+                $logOutput .= $cloneProcess->getOutput() . $cloneProcess->getErrorOutput();
+                if (!$cloneProcess->isSuccessful()) throw new \Exception("Clone failed: " . $cloneProcess->getErrorOutput());
+            }
+
+            $commands = [
+                ['git', 'pull', 'origin', $this->project->branch],
+                ['composer', 'install', '--no-interaction', '--prefer-dist'],
+            ];
+
+            // 2. Setup .env if missing
+            if (!\Illuminate\Support\Facades\File::exists($path . '/.env')) {
+                $logOutput .= "> Setting up environment variables...\n";
+                if (\Illuminate\Support\Facades\File::exists($path . '/.env.example')) {
+                    \Illuminate\Support\Facades\File::copy($path . '/.env.example', $path . '/.env');
+                    $commands[] = ['php', 'artisan', 'key:generate'];
+                }
+            }
+
+            // 3. Database & Optimization
+            $commands[] = ['php', 'artisan', 'migrate', '--force'];
+            $commands[] = ['php', 'artisan', 'optimize:clear'];
+
             foreach ($commands as $cmd) {
-                $process = new Process($cmd, $this->project->directory_path);
+                $process = new Process($cmd, $path);
                 $process->setTimeout(300);
                 $process->run();
 
@@ -58,7 +83,7 @@ class DeployProjectJob implements ShouldQueue
             $this->project->update(['last_deploy_at' => now()]);
 
         } catch (\Exception $e) {
-            $logOutput .= "\n\nError: " . $e->getMessage();
+            $logOutput .= "\n\nCRITICAL FAILURE: " . $e->getMessage();
             $this->deployment->update([
                 'status' => 'failed',
                 'log_output' => $logOutput,

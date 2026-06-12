@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('projects', ProjectController::class);
     Route::post('projects/{project}/deploy', [ProjectController::class, 'deploy'])->name('projects.deploy');
+    Route::post('projects/{project}/pull', [ProjectController::class, 'pull'])->name('projects.pull');
 
     Route::get('/monitoring', function () {
         return view('monitoring.index');
