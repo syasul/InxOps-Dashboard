@@ -97,10 +97,19 @@
                         </div>
                         <div class="flex-1 pb-8">
                             <div class="flex items-center justify-between mb-1">
-                                <span class="text-sm font-black text-white uppercase tracking-tight italic">{{ $deployment->status === 'completed' ? 'Production Build Success' : ($deployment->status === 'failed' ? 'Operation Terminated' : 'Synchronizing Data...') }}</span>
+                                <span class="text-sm font-black text-white uppercase tracking-tight italic">
+                                    {{ $deployment->status === 'completed' ? 'Production Build Success' : ($deployment->status === 'failed' ? 'Operation Terminated' : 'Synchronizing Data...') }}
+                                </span>
                                 <span class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">{{ $deployment->created_at->diffForHumans() }}</span>
                             </div>
-                            <p class="text-xs text-slate-500 font-medium">Commit: <span class="font-mono text-slate-400">#{{ substr(md5($deployment->id), 0, 7) }}</span> • Triggered via InxOps Console</p>
+                            <p class="text-xs text-slate-500 font-medium mb-3">Commit: <span class="font-mono text-slate-400">#{{ substr(md5($deployment->id), 0, 7) }}</span> • Triggered via InxOps Console</p>
+                            
+                            @if($deployment->status === 'failed' && $deployment->log_output)
+                            <div class="mt-4 p-4 bg-rose-900/20 border border-rose-500/20 rounded-2xl overflow-hidden">
+                                <p class="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Internal Server Error Log:</p>
+                                <pre class="text-[10px] font-mono text-rose-300 whitespace-pre-wrap leading-relaxed">{{ Str::limit($deployment->log_output, 500) }}</pre>
+                            </div>
+                            @endif
                         </div>
                     </div>
                     @endforeach
