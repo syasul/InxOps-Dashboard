@@ -44,6 +44,9 @@
                     <x-nav-link-custom :href="route('projects.index')" :active="request()->routeIs('projects.*')" icon="projects">
                         Deployments
                     </x-nav-link-custom>
+                    <x-nav-link-custom :href="route('storage.index')" :active="request()->routeIs('storage.*')" icon="storage">
+                        Drive Explorer
+                    </x-nav-link-custom>
                     <x-nav-link-custom :href="route('monitoring')" :active="request()->routeIs('monitoring')" icon="monitoring">
                         System Health
                     </x-nav-link-custom>

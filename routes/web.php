@@ -5,6 +5,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\SubdomainController;
 use App\Http\Controllers\TerminalController;
+use App\Http\Controllers\FileExplorerController;
 use App\Http\Controllers\Api\MetricsController;
 use Illuminate\Support\Facades\Route;
 
@@ -38,6 +39,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
     Route::post('/terminal/execute', [TerminalController::class, 'execute'])->name('terminal.execute');
+
+    Route::get('/storage', [FileExplorerController::class, 'index'])->name('storage.index');
+    Route::post('/storage/upload', [FileExplorerController::class, 'upload'])->name('storage.upload');
+    Route::get('/storage/download', [FileExplorerController::class, 'download'])->name('storage.download');
+    Route::post('/storage/folder', [FileExplorerController::class, 'createFolder'])->name('storage.folder');
+    Route::delete('/storage/delete', [FileExplorerController::class, 'destroy'])->name('storage.destroy');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
