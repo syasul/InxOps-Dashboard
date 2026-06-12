@@ -41,7 +41,9 @@ class DeployProjectJob implements ShouldQueue
                 // Ensure parent directory exists
                 \Illuminate\Support\Facades\File::ensureDirectoryExists(dirname($path), 0755, true);
                 
+                $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
                 $cloneProcess = new Process(['git', 'clone', '-b', $this->project->branch, $this->project->repo_url, $path]);
+                $cloneProcess->setEnv(['HOME' => $home]);
                 $cloneProcess->setTimeout(600);
                 $cloneProcess->run();
                 
@@ -69,12 +71,18 @@ class DeployProjectJob implements ShouldQueue
             $commands[] = ['php', 'artisan', 'optimize:clear'];
 
             // 4. Critical Permissions (Storage & Cache)
-            // Using sudo to ensure the web server (www-data) can write to these folders
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache'];
             $commands[] = ['sudo', 'chmod', '-R', '777', 'storage', 'bootstrap/cache'];
 
+            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+
             foreach ($commands as $cmd) {
                 $process = new Process($cmd, $path);
+                // Inject HOME environment variable for Composer & tools
+                $process->setEnv([
+                    'HOME' => $home,
+                    'COMPOSER_HOME' => $home . '/.composer',
+                ]);
                 $process->setTimeout(300);
                 $process->run();
 
