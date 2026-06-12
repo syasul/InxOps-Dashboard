@@ -17,7 +17,22 @@ class ProjectController extends Controller
 
     public function create()
     {
-        return view('projects.create');
+        // Dynamically resolve webapps directory based on server environment
+        $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+        $webappsPath = $home . '/webapps';
+        
+        $availableFolders = [];
+        if (\Illuminate\Support\Facades\File::exists($webappsPath)) {
+            $directories = \Illuminate\Support\Facades\File::directories($webappsPath);
+            foreach ($directories as $dir) {
+                $availableFolders[] = [
+                    'name' => basename($dir),
+                    'full_path' => $dir
+                ];
+            }
+        }
+
+        return view('projects.create', compact('availableFolders'));
     }
 
     public function store(Request $request)

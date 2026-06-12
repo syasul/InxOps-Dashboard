@@ -31,31 +31,33 @@
                 
                 <form action="{{ route('subdomains.store') }}" method="POST" class="space-y-8 relative">
                     @csrf
-                    <div class="space-y-2">
-                        <label class="block text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1">Target Application</label>
-                        <select name="project_id" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none appearance-none cursor-pointer">
-                            @foreach($projects as $project)
-                                <option value="{{ $project->id }}" class="bg-surface text-white">{{ $project->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <div class="space-y-4">
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1">Target Application</label>
+                            <select name="project_id" class="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none appearance-none cursor-pointer" required>
+                                <option value="" disabled selected class="bg-[#0c0e14]">Choose project...</option>
+                                @foreach($projects as $project)
+                                    <option value="{{ $project->id }}" class="bg-[#0c0e14]">{{ $project->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
 
-                    <div class="space-y-2">
-                        <label class="block text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1">Domain Prefix</label>
-                        <div class="flex items-center group/input overflow-hidden">
-                            <input type="text" name="subdomain_name" class="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-l-2xl px-4 py-4 text-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm" placeholder="app-v2" required>
-                            <span class="bg-white/10 border border-l-0 border-white/10 px-3 py-4 rounded-r-2xl text-slate-400 font-bold text-[11px] whitespace-nowrap">.inxdvi.com</span>
+                        <div class="space-y-2">
+                            <label class="block text-xs font-black uppercase tracking-[0.2em] text-slate-500 mb-3 ml-1">Domain Prefix</label>
+                            <div class="flex items-center group/input overflow-hidden">
+                                <input type="text" name="subdomain_name" class="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-l-2xl px-4 py-4 text-white focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all outline-none text-sm font-bold" placeholder="api-v1" required>
+                                <span class="bg-white/10 border border-l-0 border-white/10 px-4 py-4 rounded-r-2xl text-slate-400 font-black text-[11px] tracking-tight">.inxdvi.com</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="pt-2">
-                        <button type="submit" class="btn-primary w-full py-5 rounded-2xl font-black tracking-widest text-sm uppercase shadow-[0_10px_20px_rgba(59,130,246,0.2)] hover:shadow-primary/40 active:translate-y-px transition-all">
-                            GENERATE CONFIG
-                        </button>
-                    </div>
-                    
-                    <p class="text-center text-[10px] text-slate-500 uppercase font-bold tracking-widest leading-relaxed opacity-60">
-                        This will automatically generate and enable <br> a new Nginx virtual host configuration.
+                    <button type="submit" class="w-full py-5 bg-primary hover:bg-primary/90 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 transition-all active:scale-[0.98]">
+                        Generate & Broadcast Config
+                    </button>
+
+                    <p class="text-[10px] text-slate-600 font-bold text-center uppercase tracking-widest leading-relaxed">
+                        This will automatically generate Nginx hosts,<br>
+                        Enable symlinks, and Update Cloudflare DNS.
                     </p>
                 </form>
             </div>

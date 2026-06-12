@@ -7,13 +7,12 @@
             </div>
             
             <div class="flex items-center gap-3">
-                <!-- Action Buttons -->
-                <button onclick="document.getElementById('file-input').click()" class="px-6 py-3 bg-primary hover:bg-primary/90 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-primary/20 group">
+                <button onclick="document.getElementById('file-input').click()" class="px-6 py-3 bg-primary hover:bg-primary/90 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center gap-2 shadow-lg shadow-primary/20 group text-nowrap">
                     <svg class="w-4 h-4 group-hover:bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                     Upload Files
                 </button>
                 
-                <button onclick="createNewFolder()" class="px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center gap-2">
+                <button onclick="createNewFolder()" class="px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 rounded-2xl text-xs font-black text-white uppercase tracking-widest transition-all flex items-center gap-2 text-nowrap">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
                     New Folder
                 </button>
@@ -27,7 +26,7 @@
         <!-- Explorer Header Card -->
         <div class="glass p-4 rounded-[2rem] border border-white/10 flex items-center justify-between overflow-hidden relative">
             <div class="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent"></div>
-            <nav class="flex items-center gap-2 text-xs text-slate-400 font-bold bg-black/20 px-6 py-3 rounded-xl border border-white/5 overflow-x-auto relative">
+            <nav class="flex items-center gap-2 text-xs text-slate-400 font-bold bg-black/20 px-6 py-3 rounded-xl border border-white/5 overflow-x-auto relative scrollbar-hide">
                 @foreach($breadcrumbs as $breadcrumb)
                     <a href="{{ route('storage.index', ['path' => $breadcrumb['path']]) }}" class="hover:text-primary transition-colors flex items-center gap-2 whitespace-nowrap">
                         @if($loop->first)
@@ -63,36 +62,41 @@
             @endif
 
             @foreach($items as $item)
-                <div class="glass p-8 rounded-[2.5rem] border border-white/5 group relative overflow-hidden flex flex-col items-center gap-4 hover:border-primary/30 transition-all transition-duration-500">
-                    <div class="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                <div class="glass p-8 rounded-[2.5rem] border border-white/5 group relative overflow-visible flex flex-col items-center gap-4 hover:border-primary/30 transition-all duration-500">
+                    <div class="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent rounded-[2.5rem] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                     
-                    <!-- Top Ribbon for files -->
-                    @if($item['type'] === 'file')
-                    <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    @endif
-
-                    <!-- Action Buttons -->
-                    <div class="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 z-20">
-                        @if($item['type'] === 'file')
-                            <a href="{{ route('storage.download', ['path' => $item['path']]) }}" class="p-2.5 bg-black/40 text-primary hover:bg-primary hover:text-white rounded-xl transition-all shadow-xl" title="Download">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            </a>
-                        @endif
-                        <form action="{{ route('storage.destroy') }}" method="POST">
-                            @csrf @method('DELETE')
-                            <input type="hidden" name="path" value="{{ $item['path'] }}">
-                            <button type="submit" class="p-2.5 bg-black/40 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all shadow-xl" onclick="return confirm('Secure Delete?')">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <!-- Context Menu Toggle -->
+                    <div class="absolute top-4 right-4 z-30">
+                        <div class="relative dropdown">
+                            <button onclick="toggleDropdown(event, 'dropdown-{{ loop->index }}')" class="p-2 text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
                             </button>
-                        </form>
+                            
+                            <!-- Dropdown Menu -->
+                            <div id="dropdown-{{ loop->index }}" class="dropdown-menu absolute right-0 mt-2 w-48 glass-dark border border-white/10 rounded-2xl shadow-2xl opacity-0 pointer-events-none transform translate-y-2 transition-all z-40 p-2">
+                                @if($item['type'] === 'file')
+                                    <a href="{{ route('storage.download', ['path' => $item['path']]) }}" class="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-300 hover:text-white hover:bg-primary/20 rounded-xl transition-all">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                        Download File
+                                    </a>
+                                @endif
+                                <div class="h-px bg-white/5 my-1"></div>
+                                <form action="{{ route('storage.destroy') }}" method="POST">
+                                    @csrf @method('DELETE')
+                                    <input type="hidden" name="path" value="{{ $item['path'] }}">
+                                    <button type="submit" class="w-full flex items-center gap-3 px-4 py-3 text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/20 rounded-xl transition-all" onclick="return confirm('Secure Delete Permanent?')">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        Delete Forever
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
 
                     @if($item['type'] === 'directory')
                         <a href="{{ route('storage.index', ['path' => $item['path']]) }}" class="flex flex-col items-center gap-4 w-full">
-                            <div class="relative">
-                                <div class="w-24 h-24 rounded-[2.5rem] bg-secondary/10 flex items-center justify-center text-secondary group-hover:scale-110 transition-transform duration-500 shadow-2xl shadow-secondary/5 group-hover:shadow-secondary/20">
-                                    <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
-                                </div>
+                            <div class="w-24 h-24 rounded-[2.5rem] bg-secondary/10 flex items-center justify-center text-secondary group-hover:scale-110 transition-transform duration-500 shadow-2xl shadow-secondary/5 group-hover:shadow-secondary/20">
+                                <svg class="w-12 h-12" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
                             </div>
                             <div class="text-center w-full px-2">
                                 <span class="block text-sm font-black text-white truncate mb-1">{{ $item['name'] }}</span>
@@ -116,8 +120,7 @@
         @else
         <!-- Empty State Hero -->
         <div onclick="document.getElementById('file-input').click()" class="relative border-2 border-dashed border-white/5 rounded-[4rem] p-24 text-center group cursor-pointer hover:border-primary/40 transition-all overflow-hidden">
-            <div class="absolute inset-0 bg-primary/2 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <!-- Background Glow -->
+            <div class="absolute inset-0 bg-primary/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 blur-[120px] pointer-events-none"></div>
 
             <div class="relative z-10 space-y-8">
@@ -169,6 +172,30 @@
 
     @push('scripts')
     <script>
+        function toggleDropdown(event, id) {
+            event.stopPropagation();
+            const allMenus = document.querySelectorAll('.dropdown-menu');
+            allMenus.forEach(menu => {
+                if(menu.id !== id) {
+                    menu.classList.add('opacity-0', 'pointer-events-none');
+                    menu.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+                }
+            });
+            const menu = document.getElementById(id);
+            menu.classList.toggle('opacity-0');
+            menu.classList.toggle('pointer-events-none');
+            menu.classList.toggle('opacity-100');
+            menu.classList.toggle('pointer-events-auto');
+            menu.classList.toggle('translate-y-0');
+        }
+
+        window.onclick = function() {
+            document.querySelectorAll('.dropdown-menu').forEach(menu => {
+                menu.classList.add('opacity-0', 'pointer-events-none');
+                menu.classList.remove('opacity-100', 'pointer-events-auto', 'translate-y-0');
+            });
+        }
+
         function createNewFolder() {
             const name = prompt("Enter folder name:");
             if (name && name.trim()) {
@@ -256,5 +283,11 @@
             window.addEventListener('dragover', e => e.preventDefault());
         });
     </script>
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .glass-dark { background: rgba(5, 7, 10, 0.95); backdrop-filter: blur(24px); }
+        .dropdown-menu { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
     @endpush
 </x-app-layout>

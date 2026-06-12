@@ -10,16 +10,19 @@ use Illuminate\Http\Request;
 class SubdomainController extends Controller
 {
     protected $nginx;
+    protected $cloudflare;
 
-    public function __construct(NginxService $nginx)
+    public function __construct(NginxService $nginx, \App\Services\CloudflareService $cloudflare)
     {
         $this->nginx = $nginx;
+        $this->cloudflare = $cloudflare;
     }
 
     public function index()
     {
         $subdomains = Subdomain::with('project')->latest()->get();
-        $projects = Project::active()->get();
+        // Fallback if active scope is not defined
+        $projects = Project::latest()->get();
         return view('subdomains.index', compact('subdomains', 'projects'));
     }
 
@@ -32,11 +35,17 @@ class SubdomainController extends Controller
 
         $subdomain = Subdomain::create($validated);
 
-        // Generate Nginx Config
+        // 1. Generate and Save Nginx Config
         $configPath = $this->nginx->generateConfig($subdomain);
         $subdomain->update(['config_path' => $configPath]);
 
-        return back()->with('success', 'Subdomain added and Nginx config generated.');
+        // 2. Automate Enable & Reload Nginx
+        $this->nginx->enableConfig($subdomain);
+
+        // 3. Register DNS with Cloudflare
+        $this->cloudflare->registerDns($subdomain->subdomain_name);
+
+        return back()->with('success', 'Subdomain live! Nginx enabled and Cloudflare DNS registered.');
     }
 
     public function destroy(Subdomain $subdomain)
