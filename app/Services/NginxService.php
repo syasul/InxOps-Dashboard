@@ -41,10 +41,34 @@ class NginxService
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $enabledPath = "/etc/nginx/sites-enabled/{$fullDomain}";
 
-        // Symlink with sudo
+        // 1. Symlink with sudo
         $this->runSudo(['ln', '-sf', $availablePath, $enabledPath]);
         
-        return $this->reload();
+        // 2. Reload Nginx
+        $this->reload();
+
+        // 3. Auto-start the application on port 8000
+        return $this->startApplication($subdomain->project);
+    }
+
+    public function startApplication($project)
+    {
+        $path = $project->directory_path;
+        
+        // Expand tilde (~) to absolute home directory
+        if (str_starts_with($path, '~')) {
+            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+            $path = str_replace('~', $home, $path);
+        }
+
+        // Run artisan serve in background
+        // We use nohup or & to ensure it keeps running
+        $command = "cd {$path} && php artisan serve --port=8000 > /dev/null 2>&1 &";
+        
+        $process = Process::fromShellCommandline($command);
+        $process->run();
+        
+        return $process->isSuccessful();
     }
 
     protected function getTemplate($domain, $path)

@@ -2,11 +2,11 @@
     <x-slot name="header">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 w-full">
             <div class="flex items-center gap-4">
-                <div class="w-16 h-16 rounded-[2rem] bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-2xl shadow-primary/20">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xl shadow-primary/10">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
                 <div>
-                    <h1 class="text-3xl font-black text-white uppercase tracking-tighter italic leading-none mb-1">{{ $project->name }}</h1>
+                    <h1 class="text-xl font-black text-white uppercase tracking-tighter italic leading-none mb-1">{{ $project->name }}</h1>
                     <div class="flex items-center gap-2">
                         <span class="text-slate-500 text-xs font-black uppercase tracking-widest">{{ $project->branch }}</span>
                         <span class="w-1 h-1 bg-slate-800 rounded-full"></span>

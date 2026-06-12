@@ -65,7 +65,13 @@ class DeployProjectJob implements ShouldQueue
 
             // 3. Database & Optimization
             $commands[] = ['php', 'artisan', 'migrate', '--force'];
+            $commands[] = ['php', 'artisan', 'storage:link'];
             $commands[] = ['php', 'artisan', 'optimize:clear'];
+
+            // 4. Critical Permissions (Storage & Cache)
+            // Using sudo to ensure the web server (www-data) can write to these folders
+            $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache'];
+            $commands[] = ['sudo', 'chmod', '-R', '777', 'storage', 'bootstrap/cache'];
 
             foreach ($commands as $cmd) {
                 $process = new Process($cmd, $path);
