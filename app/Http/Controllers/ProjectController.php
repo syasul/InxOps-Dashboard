@@ -70,7 +70,14 @@ class ProjectController extends Controller
 
     public function pull(Project $project)
     {
-        $process = new \Symfony\Component\Process\Process(['git', 'pull', 'origin', $project->branch], $project->directory_path);
+        // Expand tilde (~) to absolute home directory
+        $path = $project->directory_path;
+        if (str_starts_with($path, '~')) {
+            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+            $path = str_replace('~', $home, $path);
+        }
+
+        $process = new \Symfony\Component\Process\Process(['git', 'pull', 'origin', $project->branch], $path);
         $process->run();
 
         if ($process->isSuccessful()) {

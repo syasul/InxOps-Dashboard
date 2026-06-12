@@ -28,6 +28,12 @@ class DeployProjectJob implements ShouldQueue
         $logOutput = "";
         $path = $this->project->directory_path;
 
+        // Expand tilde (~) to absolute home directory
+        if (str_starts_with($path, '~')) {
+            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+            $path = str_replace('~', $home, $path);
+        }
+
         try {
             // 1. Check if we need to clone the repository
             if (!\Illuminate\Support\Facades\File::exists($path . '/.git')) {
