@@ -83,6 +83,7 @@ class ServerStatsService
     protected function getLoadAvg()
     {
         $load = sys_getloadavg();
-        return implode(", ", $load);
+        $rounded = array_map(fn($val) => round($val, 2), $load);
+        return implode(", ", $rounded);
     }
 }
