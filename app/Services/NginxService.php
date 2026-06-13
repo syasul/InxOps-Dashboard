@@ -54,6 +54,7 @@ class NginxService
     public function startApplication($project)
     {
         $path = $project->directory_path;
+        $port = $project->port ?? 8000;
         
         // Expand tilde (~) to absolute home directory
         if (str_starts_with($path, '~')) {
@@ -61,9 +62,12 @@ class NginxService
             $path = str_replace('~', $home, $path);
         }
 
-        // Run artisan serve in background
-        // We use nohup or & to ensure it keeps running
-        $command = "cd {$path} && php artisan serve --port=8000 > /dev/null 2>&1 &";
+        // 1. Forcefully kill any process already using the port to avoid conflicts
+        $killCommand = "fuser -k {$port}/tcp > /dev/null 2>&1 || true";
+        exec($killCommand);
+
+        // 2. Start the application using 'nohup' to keep it running in the background
+        $command = "cd {$path} && nohup php artisan serve --port={$port} > /dev/null 2>&1 &";
         
         $process = Process::fromShellCommandline($command);
         $process->run();
