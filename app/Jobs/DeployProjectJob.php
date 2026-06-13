@@ -140,14 +140,24 @@ class DeployProjectJob implements ShouldQueue
             $commands[] = ['sudo', 'chmod', '-R', '777', 'storage', 'bootstrap/cache'];
 
             $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+            $tempBinDir = $home . '/.inxops_tmp_bin';
+            if (!\Illuminate\Support\Facades\File::exists($tempBinDir)) {
+                \Illuminate\Support\Facades\File::makeDirectory($tempBinDir, 0755, true);
+            }
+            // Shadow 'php' with the best version we found
+            $shadowPhp = $tempBinDir . '/php';
+            if (\Illuminate\Support\Facades\File::exists($shadowPhp)) {
+                @unlink($shadowPhp);
+            }
+            @symlink($php, $shadowPhp);
 
             foreach ($commands as $cmd) {
                 $process = new Process($cmd, $path);
                 $process->setEnv([
                     'HOME' => $home,
                     'COMPOSER_HOME' => $home . '/.composer',
-                    // Prepend best PHP directory to PATH
-                    'PATH' => dirname($php) . ':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin',
+                    // Force the system to see our chosen PHP as the default 'php'
+                    'PATH' => $tempBinDir . ':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin',
                 ]);
                 $process->setTimeout(300);
                 $process->run();
