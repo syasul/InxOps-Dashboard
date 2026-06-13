@@ -53,7 +53,7 @@ class DeployProjectJob implements ShouldQueue
 
             $commands = [
                 ['git', 'pull', 'origin', $this->project->branch],
-                ['composer', 'install', '--no-interaction', '--prefer-dist'],
+                ['composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs'],
             ];
 
             // 2. Setup .env if missing
