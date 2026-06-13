@@ -25,7 +25,7 @@ class NginxService
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$fullDomain}"]);
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
 
-        // Solusi Paling Tangguh: Memasukkan template lewat Input Stream (stdin)
+        // Menulis template lewat Input Stream (stdin) untuk menghindari konflik karakter shell
         $process = new Process(['sudo', 'tee', $availablePath]);
         $process->setInput($template);
         $process->run();
@@ -39,17 +39,21 @@ class NginxService
 
     public function enableConfig(Subdomain $subdomain)
     {
+        $project = $subdomain->project;
         $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $enabledPath = "/etc/nginx/sites-enabled/{$fullDomain}";
 
-        // 1. Matikan config default agar tidak konflik
+        // 1. Pastikan izin folder Laravel sudah benar (Fix 500 error)
+        $this->fixPermissions($project);
+
+        // 2. Matikan config default agar tidak konflik
         $this->runSudo(['rm', '-f', '/etc/nginx/sites-enabled/default']);
 
-        // 2. Pastikan Firewall mengizinkan HTTP dan HTTPS
+        // 3. Pastikan Firewall mengizinkan HTTP dan HTTPS
         $this->allowHttpAndHttps();
 
-        // 3. Symlink
+        // 4. Symlink
         $process = new Process(['sudo', 'ln', '-sf', $availablePath, $enabledPath]);
         $process->run();
 
@@ -57,7 +61,7 @@ class NginxService
             throw new Exception("Gagal membuat symlink Nginx: " . $process->getErrorOutput());
         }
 
-        // 4. Reload
+        // 5. Reload
         if (!$this->reload()) {
             throw new Exception("Gagal me-reload Nginx. Cek sintaks konfigurasi Anda.");
         }
@@ -65,9 +69,22 @@ class NginxService
         return true;
     }
 
+    protected function fixPermissions($project)
+    {
+        $path = $project->normalized_path ?? $project->directory_path;
+        if (str_starts_with($path, '~')) {
+            $path = str_replace('~', env('HOME', '/home/inxdvi'), $path);
+        }
+
+        // Jalankan perbaikan izin otomatis
+        $this->runSudo(['chown', '-R', 'www-data:www-data', $path]);
+        $this->runSudo(['find', $path, '-type', 'd', '-exec', 'chmod', '775', '{}', ';']);
+        $this->runSudo(['find', $path, '-type', 'f', '-exec', 'chmod', '664', '{}', ';']);
+        $this->runSudo(['chmod', '-R', '777', $path . '/storage', $path . '/bootstrap/cache']);
+    }
+
     protected function allowHttpAndHttps()
     {
-        // Menjalankan command ufw untuk membuka port 80 dan 443
         $this->runSudo(['ufw', 'allow', '80']);
         $this->runSudo(['ufw', 'allow', '443']);
     }
@@ -93,14 +110,10 @@ class NginxService
     protected function getTemplate($domain, $project)
     {
         $path = $project->normalized_path ?? $project->directory_path;
-
         if (str_starts_with($path, '~')) {
-            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
-            $path = str_replace('~', $home, $path);
+            $path = str_replace('~', env('HOME', '/home/inxdvi'), $path);
         }
-
         $root = rtrim($path, '/') . '/public';
-
         return $this->fpmTemplate($domain, $root);
     }
 
