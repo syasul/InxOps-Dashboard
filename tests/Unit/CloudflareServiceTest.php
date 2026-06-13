@@ -42,4 +42,23 @@ class CloudflareServiceTest extends TestCase
         putenv('CLOUDFLARE_DNS_TYPE');
         putenv('CLOUDFLARE_DNS_CONTENT');
     }
+
+    public function test_cloudflare_dns_registration_can_be_disabled()
+    {
+        // 1. Arrange: Disable Cloudflare DNS registration
+        putenv('CLOUDFLARE_ENABLED=false');
+
+        Http::fake();
+
+        // 2. Act: Call registerDns
+        $cloudflareService = new CloudflareService();
+        $result = $cloudflareService->registerDns('sekolah');
+
+        // 3. Assert: Verify true is returned and no HTTP requests are sent
+        $this->assertTrue($result);
+        Http::assertNothingSent();
+
+        // Clean up env variables
+        putenv('CLOUDFLARE_ENABLED');
+    }
 }

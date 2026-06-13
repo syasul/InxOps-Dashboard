@@ -19,6 +19,11 @@ class CloudflareService
 
     public function registerDns($subdomainName, $content = null)
     {
+        if (!filter_var(env('CLOUDFLARE_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
+            Log::info('Cloudflare DNS registration is disabled via CLOUDFLARE_ENABLED');
+            return true;
+        }
+
         if (!$this->apiToken || !$this->zoneId) {
             Log::warning('Cloudflare API Token or Zone ID missing in .env');
             return false;
