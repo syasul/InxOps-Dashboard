@@ -47,51 +47,66 @@ class NginxService
         // 2. Reload Nginx
         $this->reload();
 
-        // 3. Auto-start the application on port 8000
-        return $this->startApplication($subdomain->project);
+        // 3. Kita tidak perlu lagi menjalankan php artisan serve!
+        // Aplikasi akan otomatis ditangani secara profesional oleh Nginx dan PHP-FPM.
+        return true;
     }
 
     public function startApplication($project)
     {
-        $path = $project->normalized_path;
-        $port = $project->port ?? 8000;
-
-        // 1. Matikan proses lama (Wajib pakai sudo agar bisa membunuh proses milik user inxdvi)
-        $killCommand = "sudo fuser -k {$port}/tcp > /dev/null 2>&1 || true";
-        exec($killCommand);
-
-        // Beri jeda 1 detik agar port benar-benar bersih sebelum dipakai lagi
-        sleep(1);
-
-        // 2. Jalankan aplikasi sebagai user 'inxdvi' (bukan www-data) 
-        // Menggunakan exec() biasa agar proses tidak terbunuh saat script PHP dashboard selesai
-        $command = "cd {$path} && sudo -u inxdvi nohup php artisan serve --port={$port} > /dev/null 2>&1 &";
-        exec($command);
-
+        // FUNGSI INI DIBIARKAN KOSONG NAMUN TETAP ADA (RETURN TRUE)
+        // Agar script lain di InxOps Dashboard yang memanggil fungsi ini tidak error.
+        // Mesin Nginx FPM tidak butuh proses port manual.
         return true;
     }
 
     protected function getTemplate($domain, $project)
     {
-        // Check if project has a port set, if so use Proxy, otherwise use PHP-FPM
-        // This is a simplified check, usually we'd pass this in.
-        $port = $project->port ?? 8000;
-        return $this->reverseProxyTemplate($domain, $port);
+        // Mengambil path dasar project
+        $path = $project->normalized_path ?? $project->directory_path;
+
+        // Expand tilde (~) ke absolute home directory server Anda
+        if (str_starts_with($path, '~')) {
+            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
+            $path = str_replace('~', $home, $path);
+        }
+
+        // Tentukan folder "public" tempat file index.php Laravel berada
+        $root = rtrim($path, '/') . '/public';
+
+        return $this->fpmTemplate($domain, $root);
     }
 
-    protected function reverseProxyTemplate($domain, $port)
+    protected function fpmTemplate($domain, $root)
     {
+        // Template standar Nginx Laravel (Bebas Error 502/522, mendukung banyak pengunjung)
         return "server {
     listen 80;
     server_name {$domain};
+    root {$root};
+
+    add_header X-Frame-Options \"SAMEORIGIN\";
+    add_header X-Content-Type-Options \"nosniff\";
+
+    index index.php;
+    charset utf-8;
 
     location / {
-        proxy_pass http://127.0.0.1:{$port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
     }
 }";
     }
