@@ -51,11 +51,13 @@ class SubdomainController extends Controller
             return back()->with('success', 'Subdomain live! Nginx enabled and Cloudflare DNS registered.');
 
         } catch (Exception $e) {
-            // Jika sistem Nginx gagal, hapus record dari database agar tidak nyangkut
+            // Hapus record yang menggantung
             if (isset($subdomain)) {
                 $subdomain->delete();
             }
-            return back()->with('error', 'Sistem Nginx Gagal: ' . $e->getMessage());
+
+            // TAMPILKAN ERROR SECARA KASAR KE LAYAR (DUMP & DIE)
+            dd("PESAN ERROR UNTUK DIBACA: " . $e->getMessage());
         }
     }
 
