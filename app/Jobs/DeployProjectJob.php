@@ -189,13 +189,28 @@ class DeployProjectJob implements ShouldQueue
                 $process->setTimeout(300);
                 $process->run();
 
-                $logOutput .= "\n> " . implode(' ', $cmd) . "\n";
-                $logOutput .= $process->getOutput();
-                $logOutput .= $process->getErrorOutput();
+                $logPiece = "\n> " . implode(' ', $cmd) . "\n";
+                $logPiece .= $process->getOutput();
+                $logPiece .= $process->getErrorOutput();
+                
+                $logOutput .= $logPiece;
+                
+                // Incremental Logging: Update database after each command so user can see progress
+                $this->deployment->update(['log_output' => $logOutput]);
 
                 if (!$process->isSuccessful()) {
                     throw new ProcessFailedException($process);
                 }
+            }
+
+            // 5. Automatic App Management: Restart the application if it has a subdomain
+            // This makes the "Build Now" button feel truly automatic.
+            $nginx = new \App\Services\NginxService();
+            $subdomain = \App\Models\Subdomain::where('project_id', $this->project->id)->first();
+            if ($subdomain) {
+                $logOutput .= "\n> Automatically restarting application via Nginx Control...\n";
+                $nginx->startApplication($this->project);
+                $nginx->reload();
             }
 
             $this->deployment->update([
@@ -211,6 +226,11 @@ class DeployProjectJob implements ShouldQueue
                 'status' => 'failed',
                 'log_output' => $logOutput,
             ]);
+        } finally {
+            // Cleanup Shadowing
+            if (isset($tempBinDir) && \Illuminate\Support\Facades\File::exists($tempBinDir)) {
+                @\Illuminate\Support\Facades\File::deleteDirectory($tempBinDir);
+            }
         }
     }
 }

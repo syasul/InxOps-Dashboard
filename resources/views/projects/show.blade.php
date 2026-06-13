@@ -104,10 +104,12 @@
                             </div>
                             <p class="text-xs text-slate-500 font-medium mb-3">Commit: <span class="font-mono text-slate-400">#{{ substr(md5($deployment->id), 0, 7) }}</span> • Triggered via InxOps Console</p>
                             
-                            @if($deployment->status === 'failed' && $deployment->log_output)
-                            <div class="mt-4 p-4 bg-rose-900/20 border border-rose-500/20 rounded-2xl overflow-hidden">
-                                <p class="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Internal Server Error Log:</p>
-                                <pre class="text-[10px] font-mono text-rose-300 whitespace-pre-wrap leading-relaxed">{{ Str::limit($deployment->log_output, 500) }}</pre>
+                            @if($deployment->log_output)
+                            <div class="mt-4 p-4 {{ $deployment->status === 'failed' ? 'bg-rose-900/10 border-rose-500/20' : 'bg-slate-900/30 border-white/5' }} border rounded-2xl overflow-hidden">
+                                <p class="text-[10px] font-black {{ $deployment->status === 'failed' ? 'text-rose-500' : 'text-slate-500' }} uppercase tracking-widest mb-2">
+                                    {{ $deployment->status === 'failed' ? 'Internal Server Error Log:' : 'Activity Console Output:' }}
+                                </p>
+                                <pre class="text-[10px] font-mono {{ $deployment->status === 'failed' ? 'text-rose-300' : 'text-slate-400' }} whitespace-pre-wrap leading-relaxed">{{ $deployment->log_output }}</pre>
                             </div>
                             @endif
                         </div>
@@ -128,4 +130,13 @@
             </div>
         </div>
     </div>
+
+    @if($project->deployments->whereIn('status', ['running', 'pending'])->count() > 0)
+    <script>
+        // Automatic Real-time Log Streaming Poller
+        setInterval(function() {
+            window.location.reload();
+        }, 3000);
+    </script>
+    @endif
 </x-app-layout>
