@@ -63,16 +63,24 @@ class ProjectController extends Controller
             'status' => 'pending',
         ]);
 
+        // 1. Dispatch the job normally to the 'database' queue
         DeployProjectJob::dispatch($project, $deployment);
 
-        // Signal workers to restart to pick up potential code changes in the Job class
+        // 2. SELF-HEALING QUEUE: Start a one-off worker process in the background
+        // This ensures the job is processed even if the user hasn't set up a supervisor.
+        // We use the full path to PHP or the generic 'php' binary.
+        $artisanPath = base_path('artisan');
+        $command = "php {$artisanPath} queue:work --once --tries=1 > /dev/null 2>&1 &";
+        
         try {
-            \Illuminate\Support\Facades\Artisan::call('queue:restart');
+            // Use exec to spawn the background process
+            exec($command);
         } catch (\Exception $e) {
-            // Ignore if artisan call fails
+            // Fallback: If exec is disabled, we'll try dispatchSync as a last resort
+            DeployProjectJob::dispatchSync($project, $deployment);
         }
 
-        return back()->with('success', 'Deployment started.');
+        return back()->with('success', 'Deployment engine started in background.');
     }
 
     public function pull(Project $project)
