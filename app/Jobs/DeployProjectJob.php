@@ -117,25 +117,32 @@ class DeployProjectJob implements ShouldQueue
                     }
                 }
 
-                // If we still don't have 8.4, we MUST patch the dependencies to be 8.3-compatible
-                if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
-                    $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
-                    
-                    // We directly modify composer.json to cap Symfony at 7.1 to avoid PHP 8.4 property hooks
-                    $composerJsonPath = $path . '/composer.json';
-                    if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
-                        $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
+                    // If we still don't have 8.4, we MUST patch the dependencies to be 8.3-compatible
+                    if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
+                        $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
                         
-                        // Force symfony components to a version that doesn't use 8.4 features
-                        $composerJson['require']['symfony/http-foundation'] = '7.1.*';
-                        $composerJson['require']['symfony/error-handler'] = '7.1.*';
-                        $composerJson['require']['symfony/console'] = '7.1.*';
-                        
-                        \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-                        
-                        $logOutput .= "> composer.json patched for PHP 8.3 compatibility.\n";
-                    }
-                } else {
+                        // We directly modify composer.json to cap Symfony at 7.1 to avoid PHP 8.4 property hooks
+                        $composerJsonPath = $path . '/composer.json';
+                        if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
+                            $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
+                            
+                            // Force symfony components to a version that doesn't use 8.4 features
+                            $composerJson['require']['symfony/http-foundation'] = '7.1.*';
+                            $composerJson['require']['symfony/error-handler'] = '7.1.*';
+                            $composerJson['require']['symfony/console'] = '7.1.*';
+                            
+                            \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                            
+                            $logOutput .= "> composer.json patched for PHP 8.3 compatibility.\n";
+
+                            // IMPORTANT: Because we modified composer.json, we must run 'update' for these packages 
+                            // to reconcile the lock file, otherwise 'composer install' will fail.
+                            $patchUpdateCmd = [$php, $composer, 'update', 'symfony/http-foundation', 'symfony/error-handler', 'symfony/console', '--no-interaction', '--ignore-platform-reqs', '--with-all-dependencies'];
+                            
+                            // Insert this update command at the beginning of the deployment process
+                            array_unshift($commands, $patchUpdateCmd);
+                        }
+                    } else {
                     $php = '/usr/bin/php8.4';
                     $logOutput .= "> PHP 8.4 successfully installed and selected.\n";
                 }
