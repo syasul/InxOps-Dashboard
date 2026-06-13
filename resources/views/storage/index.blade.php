@@ -68,12 +68,12 @@
                     <!-- Context Menu Toggle -->
                     <div class="absolute top-4 right-4 z-30">
                         <div class="relative dropdown">
-                            <button onclick="toggleDropdown(event, 'dropdown-{{ loop->index }}')" class="p-2 text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
+                            <button onclick="toggleDropdown(event, 'dropdown-{{ $loop->index }}')" class="p-2 text-slate-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/></svg>
                             </button>
                             
                             <!-- Dropdown Menu -->
-                            <div id="dropdown-{{ loop->index }}" class="dropdown-menu absolute right-0 mt-2 w-48 glass-dark border border-white/10 rounded-2xl shadow-2xl opacity-0 pointer-events-none transform translate-y-2 transition-all z-40 p-2">
+                            <div id="dropdown-{{ $loop->index }}" class="dropdown-menu absolute right-0 mt-2 w-48 glass-dark border border-white/10 rounded-2xl shadow-2xl opacity-0 pointer-events-none transform translate-y-2 transition-all z-40 p-2">
                                 @if($item['type'] === 'file')
                                     <a href="{{ route('storage.download', ['path' => $item['path']]) }}" class="flex items-center gap-3 px-4 py-3 text-xs font-bold text-slate-300 hover:text-white hover:bg-primary/20 rounded-xl transition-all">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>

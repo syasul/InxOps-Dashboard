@@ -77,14 +77,15 @@ class DeployProjectJob implements ShouldQueue
             $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
 
             foreach ($commands as $cmd) {
-                // Brute force: Prepend environment variables directly to the shell command
-                $commandString = "HOME={$home} COMPOSER_HOME={$home}/.composer " . implode(' ', $cmd);
-                
-                $process = Process::fromShellCommandline($commandString, $path);
+                $process = new Process($cmd, $path);
+                $process->setEnv([
+                    'HOME' => $home,
+                    'COMPOSER_HOME' => $home . '/.composer',
+                ]);
                 $process->setTimeout(300);
                 $process->run();
 
-                $logOutput .= "\n> " . $commandString . "\n";
+                $logOutput .= "\n> " . implode(' ', $cmd) . "\n";
                 $logOutput .= $process->getOutput();
                 $logOutput .= $process->getErrorOutput();
 

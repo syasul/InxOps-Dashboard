@@ -92,13 +92,13 @@
                     @foreach($project->deployments as $deployment)
                     <div class="flex gap-6 group">
                         <div class="flex flex-col items-center">
-                            <div class="w-3 h-3 rounded-full border-2 {{ $deployment->status === 'completed' ? 'border-emerald-500 bg-emerald-500' : ($deployment->status === 'failed' ? 'border-rose-500 bg-rose-500' : 'border-primary bg-primary animate-pulse') }}"></div>
+                            <div class="w-3 h-3 rounded-full border-2 {{ $deployment->status === 'success' ? 'border-emerald-500 bg-emerald-500' : ($deployment->status === 'failed' ? 'border-rose-500 bg-rose-500' : 'border-primary bg-primary animate-pulse') }}"></div>
                             <div class="w-px h-full bg-slate-800 group-last:bg-transparent mt-2"></div>
                         </div>
                         <div class="flex-1 pb-8">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-sm font-black text-white uppercase tracking-tight italic">
-                                    {{ $deployment->status === 'completed' ? 'Production Build Success' : ($deployment->status === 'failed' ? 'Operation Terminated' : 'Synchronizing Data...') }}
+                                    {{ $deployment->status === 'success' ? 'Production Build Success' : ($deployment->status === 'failed' ? 'Operation Terminated' : 'Synchronizing Data...') }}
                                 </span>
                                 <span class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">{{ $deployment->created_at->diffForHumans() }}</span>
                             </div>
