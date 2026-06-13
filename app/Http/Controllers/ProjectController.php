@@ -63,24 +63,11 @@ class ProjectController extends Controller
             'status' => 'pending',
         ]);
 
-        // 1. Dispatch the job normally to the 'database' queue
+        // Dispatch the job to the queue. 
+        // Supervisor (running as user 'inxdvi') will automatically pick this up!
         DeployProjectJob::dispatch($project, $deployment);
 
-        // 2. SELF-HEALING QUEUE: Start a one-off worker process in the background
-        // This ensures the job is processed even if the user hasn't set up a supervisor.
-        // We use the full path to PHP or the generic 'php' binary.
-        $artisanPath = base_path('artisan');
-        $command = "php {$artisanPath} queue:work --once --tries=1 > /dev/null 2>&1 &";
-        
-        try {
-            // Use exec to spawn the background process
-            exec($command);
-        } catch (\Exception $e) {
-            // Fallback: If exec is disabled, we'll try dispatchSync as a last resort
-            DeployProjectJob::dispatchSync($project, $deployment);
-        }
-
-        return back()->with('success', 'Deployment engine started in background.');
+        return back()->with('success', 'Deployment queued. Supervisor is handling it safely in the background.');
     }
 
     public function pull(Project $project)
