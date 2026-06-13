@@ -29,4 +29,21 @@ class Project extends Model
     {
         return $query->where('active', true);
     }
+
+    public function getNormalizedPathAttribute()
+    {
+        $path = $this->directory_path;
+
+        if (str_starts_with($path, '/var/www/webapps')) {
+            $path = '/home/inxdvi/webapps' . substr($path, 16);
+        } elseif (str_starts_with($path, '/webapps')) {
+            $path = '/home/inxdvi/webapps' . substr($path, 8);
+        } elseif (str_starts_with($path, '~/webapps')) {
+            $path = '/home/inxdvi/webapps' . substr($path, 9);
+        } elseif (str_starts_with($path, '~')) {
+            $path = '/home/inxdvi' . substr($path, 1);
+        }
+
+        return $path;
+    }
 }

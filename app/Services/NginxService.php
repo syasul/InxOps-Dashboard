@@ -53,14 +53,8 @@ class NginxService
 
     public function startApplication($project)
     {
-        $path = $project->directory_path;
+        $path = $project->normalized_path;
         $port = $project->port ?? 8000;
-
-        // Expand tilde (~) to absolute home directory
-        if (str_starts_with($path, '~')) {
-            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
-            $path = str_replace('~', $home, $path);
-        }
 
         // 1. Matikan proses lama (Wajib pakai sudo agar bisa membunuh proses milik user inxdvi)
         $killCommand = "sudo fuser -k {$port}/tcp > /dev/null 2>&1 || true";

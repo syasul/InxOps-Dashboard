@@ -26,13 +26,7 @@ class DeployProjectJob implements ShouldQueue
     {
         $this->deployment->update(['status' => 'running']);
         $logOutput = "";
-        $path = $this->project->directory_path;
-
-        // Expand tilde (~) to absolute home directory
-        if (str_starts_with($path, '~')) {
-            $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
-            $path = str_replace('~', $home, $path);
-        }
+        $path = $this->project->normalized_path;
 
         try {
             // 1. Check if we need to clone the repository
