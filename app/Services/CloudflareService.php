@@ -17,28 +17,34 @@ class CloudflareService
         $this->zoneId = env('CLOUDFLARE_ZONE_ID');
     }
 
-    public function registerDns($subdomainName, $ipAddress = null)
+    public function registerDns($subdomainName, $content = null)
     {
         if (!$this->apiToken || !$this->zoneId) {
             Log::warning('Cloudflare API Token or Zone ID missing in .env');
             return false;
         }
 
-        // Default to server's public IP if not provided
-        $ipAddress = $ipAddress ?: $this->getServerIp();
+        $type = env('CLOUDFLARE_DNS_TYPE', 'A');
+        
+        if ($type === 'CNAME') {
+            $content = $content ?: env('CLOUDFLARE_DNS_CONTENT', 'dashboard.inxdvi.com');
+        } else {
+            $content = $content ?: $this->getServerIp();
+        }
+
         $fullDomain = $subdomainName . '.inxdvi.com';
 
         $response = Http::withToken($this->apiToken)
             ->post("{$this->baseUrl}/zones/{$this->zoneId}/dns_records", [
-                'type' => 'A',
+                'type' => $type,
                 'name' => $fullDomain,
-                'content' => $ipAddress,
+                'content' => $content,
                 'ttl' => 1, // Auto
                 'proxied' => true,
             ]);
 
         if ($response->successful()) {
-            Log::info("DNS registered for {$fullDomain} pointing to {$ipAddress}");
+            Log::info("DNS registered for {$fullDomain} (Type: {$type}) pointing to {$content}");
             return true;
         }
 
