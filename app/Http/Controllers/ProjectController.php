@@ -78,6 +78,10 @@ class ProjectController extends Controller
         }
 
         $process = new \Symfony\Component\Process\Process(['git', 'pull', 'origin', $project->branch], $path);
+        $process->setEnv([
+            'PATH' => '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+            'HOME' => env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi'),
+        ]);
         $process->run();
 
         if ($process->isSuccessful()) {

@@ -43,6 +43,10 @@ class TerminalController extends Controller
 
         try {
             $process = Process::fromShellCommandline($command, $cwd);
+            $process->setEnv([
+                'PATH' => '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+                'HOME' => env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi'),
+            ]);
             $process->setTimeout(60);
             $process->run();
 

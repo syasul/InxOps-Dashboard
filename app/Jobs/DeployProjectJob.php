@@ -43,7 +43,10 @@ class DeployProjectJob implements ShouldQueue
                 
                 $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
                 $cloneProcess = new Process(['git', 'clone', '-b', $this->project->branch, $this->project->repo_url, $path]);
-                $cloneProcess->setEnv(['HOME' => $home]);
+                $cloneProcess->setEnv([
+                    'HOME' => $home,
+                    'PATH' => '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+                ]);
                 $cloneProcess->setTimeout(600);
                 $cloneProcess->run();
                 
@@ -51,9 +54,17 @@ class DeployProjectJob implements ShouldQueue
                 if (!$cloneProcess->isSuccessful()) throw new \Exception("Clone failed: " . $cloneProcess->getErrorOutput());
             }
 
+            // Path to PHP and Composer
+            $php = PHP_BINARY;
+            // Let's try to find composer if it's not in the PATH
+            $composer = 'composer';
+            if (\Illuminate\Support\Facades\File::exists('/opt/homebrew/bin/composer')) {
+                $composer = '/opt/homebrew/bin/composer';
+            }
+
             $commands = [
                 ['git', 'pull', 'origin', $this->project->branch],
-                ['composer', 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs'],
+                [$php, $composer, 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader'],
             ];
 
             // 2. Setup .env if missing
@@ -61,14 +72,14 @@ class DeployProjectJob implements ShouldQueue
                 $logOutput .= "> Setting up environment variables...\n";
                 if (\Illuminate\Support\Facades\File::exists($path . '/.env.example')) {
                     \Illuminate\Support\Facades\File::copy($path . '/.env.example', $path . '/.env');
-                    $commands[] = ['php', 'artisan', 'key:generate'];
+                    $commands[] = [$php, 'artisan', 'key:generate'];
                 }
             }
 
             // 3. Database & Optimization
-            $commands[] = ['php', 'artisan', 'migrate', '--force'];
-            $commands[] = ['php', 'artisan', 'storage:link'];
-            $commands[] = ['php', 'artisan', 'optimize:clear'];
+            $commands[] = [$php, 'artisan', 'migrate', '--force'];
+            $commands[] = [$php, 'artisan', 'storage:link'];
+            $commands[] = [$php, 'artisan', 'optimize:clear'];
 
             // 4. Critical Permissions (Storage & Cache)
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache'];
@@ -81,6 +92,7 @@ class DeployProjectJob implements ShouldQueue
                 $process->setEnv([
                     'HOME' => $home,
                     'COMPOSER_HOME' => $home . '/.composer',
+                    'PATH' => '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
                 ]);
                 $process->setTimeout(300);
                 $process->run();
