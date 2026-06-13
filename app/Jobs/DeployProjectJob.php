@@ -59,48 +59,30 @@ class DeployProjectJob implements ShouldQueue
             $composer = 'composer';
 
             // 1. Try to find the best PHP version (prefer 8.4+)
+            // We'll search in this order
             $phpPossibilities = ['php9.0', 'php8.5', 'php8.4', 'php'];
-            $foundPhp = false;
             foreach ($phpPossibilities as $p) {
                 $process = new Process(['which', $p]);
                 $process->run();
                 if ($process->isSuccessful()) {
                     $candidate = trim($process->getOutput());
                     if ($candidate) {
-                        // If it's just 'php', check version
-                        if ($p === 'php') {
-                            $vProcess = new Process([$candidate, '-r', 'echo PHP_VERSION;']);
-                            $vProcess->run();
-                            if ($vProcess->isSuccessful() && version_compare(trim($vProcess->getOutput()), '8.4.0', '>=')) {
-                                $php = $candidate;
-                                $foundPhp = true;
-                                break;
-                            }
-                        } else {
-                            $php = $candidate;
-                            $foundPhp = true;
-                            break;
-                        }
+                        $php = $candidate;
+                        break;
                     }
                 }
             }
 
-            // 2. Try to find Composer
+            // 2. Try to find Composer absolute path
             $process = new Process(['which', 'composer']);
             $process->run();
             if ($process->isSuccessful()) {
-                $composer = trim($process->getOutput());
+                $composerPath = trim($process->getOutput());
+                // Use the absolute path if found
+                if ($composerPath) $composer = $composerPath;
             } else {
-                // Manual fallback search
-                $composerPaths = [
-                    '/usr/local/bin/composer',
-                    '/opt/homebrew/bin/composer',
-                    '/usr/bin/composer',
-                    '/usr/local/share/composer/composer.phar',
-                    '/usr/share/composer/composer.phar',
-                    '/home/inxdvi/bin/composer'
-                ];
-                foreach ($composerPaths as $cp) {
+                // Secondary fallback search
+                foreach (['/usr/local/bin/composer', '/usr/bin/composer', '/opt/homebrew/bin/composer'] as $cp) {
                     if (\Illuminate\Support\Facades\File::exists($cp)) {
                         $composer = $cp;
                         break;
@@ -110,8 +92,13 @@ class DeployProjectJob implements ShouldQueue
 
             $commands = [
                 ['git', 'pull', 'origin', $this->project->branch],
-                [$php, $composer, 'install', '--no-interaction', '--prefer-dist', '--optimize-autoloader'],
+                // We use $php prefix ONLY if we have an absolute path to composer phar
+                // If composer is an executable, we can just run it
+                (str_contains($composer, '/') ? [$php, $composer] : [$composer]),
             ];
+            
+            // Reconstruct the composer command with its arguments
+            $commands[1] = array_merge($commands[1], ['install', '--no-interaction', '--prefer-dist', '--optimize-autoloader']);
 
             // 2. Setup .env if missing
             if (!\Illuminate\Support\Facades\File::exists($path . '/.env')) {
@@ -138,7 +125,8 @@ class DeployProjectJob implements ShouldQueue
                 $process->setEnv([
                     'HOME' => $home,
                     'COMPOSER_HOME' => $home . '/.composer',
-                    'PATH' => '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+                    // Prepend best PHP directory to PATH
+                    'PATH' => dirname($php) . ':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin',
                 ]);
                 $process->setTimeout(300);
                 $process->run();

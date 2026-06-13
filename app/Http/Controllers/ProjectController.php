@@ -65,6 +65,13 @@ class ProjectController extends Controller
 
         DeployProjectJob::dispatch($project, $deployment);
 
+        // Signal workers to restart to pick up potential code changes in the Job class
+        try {
+            \Illuminate\Support\Facades\Artisan::call('queue:restart');
+        } catch (\Exception $e) {
+            // Ignore if artisan call fails
+        }
+
         return back()->with('success', 'Deployment started.');
     }
 
