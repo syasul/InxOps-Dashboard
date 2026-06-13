@@ -173,7 +173,8 @@ class DeployProjectJob implements ShouldQueue
             ];
             
             // Reconstruct the composer command with its arguments
-            $commands[1] = array_merge($commands[1], ['install', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs']);
+            // DIUBAH: Menggunakan 'update' alih-alih 'install' agar selalu otomatis menyamakan lock file
+            $commands[1] = array_merge($commands[1], ['update', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs']);
 
             // 2. Setup .env if missing
             if (!\Illuminate\Support\Facades\File::exists($path . '/.env')) {
