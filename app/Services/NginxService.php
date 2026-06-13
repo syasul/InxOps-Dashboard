@@ -14,10 +14,10 @@ class NginxService
         $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
         $shortName = $subdomain->subdomain_name;
         $template = $this->getTemplate($fullDomain, $project);
-        
+
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $oldPath = "/etc/nginx/sites-available/{$shortName}";
-        
+
         // Write locally first
         $tempPath = storage_path("nginx/{$fullDomain}.conf");
         File::ensureDirectoryExists(storage_path("nginx"));
@@ -31,7 +31,7 @@ class NginxService
 
         // Copy new config
         $this->runSudo(['cp', $tempPath, $availablePath]);
-        
+
         return $availablePath;
     }
 
@@ -43,7 +43,7 @@ class NginxService
 
         // 1. Symlink with sudo
         $this->runSudo(['ln', '-sf', $availablePath, $enabledPath]);
-        
+
         // 2. Reload Nginx
         $this->reload();
 
@@ -55,23 +55,25 @@ class NginxService
     {
         $path = $project->directory_path;
         $port = $project->port ?? 8000;
-        
+
         // Expand tilde (~) to absolute home directory
         if (str_starts_with($path, '~')) {
             $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
             $path = str_replace('~', $home, $path);
         }
 
-        // 1. Forcefully kill any process already using the port to avoid conflicts
-        $killCommand = "fuser -k {$port}/tcp > /dev/null 2>&1 || true";
+        // 1. Matikan proses lama (Wajib pakai sudo agar bisa membunuh proses milik user inxdvi)
+        $killCommand = "sudo fuser -k {$port}/tcp > /dev/null 2>&1 || true";
         exec($killCommand);
 
-        // 2. Start the application using 'nohup' to keep it running in the background
-        $command = "cd {$path} && nohup php artisan serve --port={$port} > /dev/null 2>&1 &";
-        
-        $process = Process::fromShellCommandline($command);
-        $process->start();
-        
+        // Beri jeda 1 detik agar port benar-benar bersih sebelum dipakai lagi
+        sleep(1);
+
+        // 2. Jalankan aplikasi sebagai user 'inxdvi' (bukan www-data) 
+        // Menggunakan exec() biasa agar proses tidak terbunuh saat script PHP dashboard selesai
+        $command = "cd {$path} && sudo -u inxdvi nohup php artisan serve --port={$port} > /dev/null 2>&1 &";
+        exec($command);
+
         return true;
     }
 
