@@ -58,9 +58,30 @@ class DeployProjectJob implements ShouldQueue
             $php = PHP_BINARY;
             $composer = 'composer';
 
-            // 1. Try to find the best PHP version (prefer 8.4+)
-            // We'll search in this order
-            $phpPossibilities = ['php9.0', 'php8.5', 'php8.4', 'php'];
+            // 1. Try to find the best PHP version (prefer latest)
+            $phpPossibilities = ['php9.0', 'php8.5', 'php8.4', 'php8.3', 'php8.2', 'php'];
+            
+            // Proactively search for any php8.x or php9.x binaries
+            $binPaths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin'];
+            foreach ($binPaths as $bp) {
+                if (\Illuminate\Support\Facades\File::exists($bp)) {
+                    $files = \Illuminate\Support\Facades\File::files($bp);
+                    foreach ($files as $file) {
+                        $filename = $file->getFilename();
+                        if (preg_match('/^php[89]\.[0-9]+$/', $filename)) {
+                            $phpPossibilities[] = $filename;
+                        }
+                    }
+                }
+            }
+            // Sort to get highest versions first (e.g. 9.0, 8.5, 8.4...)
+            usort($phpPossibilities, function($a, $b) {
+                if ($a === 'php') return 1;
+                if ($b === 'php') return -1;
+                return version_compare(str_replace('php', '', $b), str_replace('php', '', $a));
+            });
+            $phpPossibilities = array_unique($phpPossibilities);
+
             foreach ($phpPossibilities as $p) {
                 $process = new Process(['which', $p]);
                 $process->run();
