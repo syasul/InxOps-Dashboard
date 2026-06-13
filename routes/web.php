@@ -13,6 +13,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+Route::get('/api/metrics', [MetricsController::class, 'index'])->name('api.metrics');
 Route::post('/webhook/github', [WebhookController::class, 'github'])->name('webhook.github');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -36,8 +37,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::resource('subdomains', SubdomainController::class)->only(['index', 'store', 'destroy']);
 
-    Route::get('/api/metrics', [MetricsController::class, 'index'])->name('api.metrics');
-
     Route::get('/terminal', [TerminalController::class, 'index'])->name('terminal.index');
     Route::post('/terminal/execute', [TerminalController::class, 'execute'])->name('terminal.execute');
 
@@ -52,4 +51,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
