@@ -26,7 +26,6 @@ class NginxService
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
 
         // Solusi Paling Tangguh: Memasukkan template lewat Input Stream (stdin)
-        // Bypass semua masalah karakter khusus dan multi-line di terminal
         $process = new Process(['sudo', 'tee', $availablePath]);
         $process->setInput($template);
         $process->run();
@@ -44,7 +43,13 @@ class NginxService
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $enabledPath = "/etc/nginx/sites-enabled/{$fullDomain}";
 
-        // Menggunakan array untuk menghindari masalah pembacaan shell
+        // 1. Matikan config default agar tidak konflik
+        $this->runSudo(['rm', '-f', '/etc/nginx/sites-enabled/default']);
+
+        // 2. Pastikan Firewall mengizinkan HTTP dan HTTPS
+        $this->allowHttpAndHttps();
+
+        // 3. Symlink
         $process = new Process(['sudo', 'ln', '-sf', $availablePath, $enabledPath]);
         $process->run();
 
@@ -52,12 +57,19 @@ class NginxService
             throw new Exception("Gagal membuat symlink Nginx: " . $process->getErrorOutput());
         }
 
-        // Reload Nginx
+        // 4. Reload
         if (!$this->reload()) {
             throw new Exception("Gagal me-reload Nginx. Cek sintaks konfigurasi Anda.");
         }
 
         return true;
+    }
+
+    protected function allowHttpAndHttps()
+    {
+        // Menjalankan command ufw untuk membuka port 80 dan 443
+        $this->runSudo(['ufw', 'allow', '80']);
+        $this->runSudo(['ufw', 'allow', '443']);
     }
 
     public function removeConfig(Subdomain $subdomain)
