@@ -67,10 +67,12 @@ class DeployProjectJob implements ShouldQueue
                 if (\Illuminate\Support\Facades\File::exists($bp)) {
                     $files = \Illuminate\Support\Facades\File::files($bp);
                     foreach ($files as $file) {
-                        $filename = $file->getFilename();
-                        if (preg_match('/^php[89]\.[0-9]+$/', $filename)) {
-                            $phpPossibilities[] = $filename;
-                        }
+                        try {
+                            $filename = $file->getFilename();
+                            if (preg_match('/^php[89]\.[0-9]+$/', $filename)) {
+                                $phpPossibilities[] = $filename;
+                            }
+                        } catch (\Exception $e) {}
                     }
                 }
             }
@@ -82,6 +84,7 @@ class DeployProjectJob implements ShouldQueue
             });
             $phpPossibilities = array_unique($phpPossibilities);
 
+            $bestPhpFound = false;
             foreach ($phpPossibilities as $p) {
                 $process = new Process(['which', $p]);
                 $process->run();
@@ -89,8 +92,32 @@ class DeployProjectJob implements ShouldQueue
                     $candidate = trim($process->getOutput());
                     if ($candidate) {
                         $php = $candidate;
+                        if (str_contains($p, '8.4') || str_contains($p, '8.5') || str_contains($p, '9.')) {
+                            $bestPhpFound = true;
+                        }
                         break;
                     }
+                }
+            }
+
+            // SELF-HEALING: If we don't have 8.4+, try to install it (Ubuntu/Debian)
+            if (!$bestPhpFound && \Illuminate\Support\Facades\File::exists('/usr/bin/apt-get')) {
+                $logOutput .= "> PHP 8.4+ not found. Attempting self-healing installation...\n";
+                $installCmds = [
+                    ['sudo', '-n', 'add-apt-repository', 'ppa:ondrej/php', '-y'],
+                    ['sudo', '-n', 'apt-get', 'update', '-y'],
+                    ['sudo', '-n', 'apt-get', 'install', 'php8.4-cli', 'php8.4-common', 'php8.4-mysql', 'php8.4-xml', 'php8.4-curl', 'php8.4-mbstring', 'php8.4-zip', '-y']
+                ];
+                foreach ($installCmds as $icmd) {
+                    $iprocess = new Process($icmd);
+                    $iprocess->run();
+                    $logOutput .= implode(' ', $icmd) . "\n" . $iprocess->getOutput() . $iprocess->getErrorOutput();
+                }
+                
+                // Re-check after installation
+                if (\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
+                    $php = '/usr/bin/php8.4';
+                    $logOutput .= "> PHP 8.4 successfully installed and selected.\n";
                 }
             }
 
