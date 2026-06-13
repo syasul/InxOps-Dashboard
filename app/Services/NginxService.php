@@ -13,7 +13,7 @@ class NginxService
         $project = $subdomain->project;
         $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
         $shortName = $subdomain->subdomain_name;
-        $template = $this->getTemplate($fullDomain, $project->directory_path);
+        $template = $this->getTemplate($fullDomain, $project);
         
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $oldPath = "/etc/nginx/sites-available/{$shortName}";
@@ -75,21 +75,22 @@ class NginxService
         return $process->isSuccessful();
     }
 
-    protected function getTemplate($domain, $path)
+    protected function getTemplate($domain, $project)
     {
         // Check if project has a port set, if so use Proxy, otherwise use PHP-FPM
         // This is a simplified check, usually we'd pass this in.
-        return $this->reverseProxyTemplate($domain);
+        $port = $project->port ?? 8000;
+        return $this->reverseProxyTemplate($domain, $port);
     }
 
-    protected function reverseProxyTemplate($domain)
+    protected function reverseProxyTemplate($domain, $port)
     {
         return "server {
     listen 80;
     server_name {$domain};
 
     location / {
-        proxy_pass http://127.0.0.1:8000;
+        proxy_pass http://127.0.0.1:{$port};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
