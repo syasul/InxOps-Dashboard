@@ -34,7 +34,7 @@ class DeployProjectJob implements ShouldQueue
                 $logOutput .= "> Initializing fresh clone...\n";
                 // Ensure parent directory exists
                 \Illuminate\Support\Facades\File::ensureDirectoryExists(dirname($path), 0755, true);
-                
+
                 $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
                 $cloneProcess = new Process(['git', 'clone', '-b', $this->project->branch, $this->project->repo_url, $path]);
                 $cloneProcess->setEnv([
@@ -43,9 +43,10 @@ class DeployProjectJob implements ShouldQueue
                 ]);
                 $cloneProcess->setTimeout(600);
                 $cloneProcess->run();
-                
+
                 $logOutput .= $cloneProcess->getOutput() . $cloneProcess->getErrorOutput();
-                if (!$cloneProcess->isSuccessful()) throw new \Exception("Clone failed: " . $cloneProcess->getErrorOutput());
+                if (!$cloneProcess->isSuccessful())
+                    throw new \Exception("Clone failed: " . $cloneProcess->getErrorOutput());
             }
 
             // Path to PHP and Composer
@@ -54,7 +55,7 @@ class DeployProjectJob implements ShouldQueue
 
             // 1. Try to find the best PHP version (prefer latest)
             $phpPossibilities = ['php9.0', 'php8.5', 'php8.4', 'php8.3', 'php8.2', 'php'];
-            
+
             // Proactively search for any php8.x or php9.x binaries
             $binPaths = ['/usr/bin', '/usr/local/bin', '/opt/homebrew/bin'];
             foreach ($binPaths as $bp) {
@@ -66,14 +67,17 @@ class DeployProjectJob implements ShouldQueue
                             if (preg_match('/^php[89]\.[0-9]+$/', $filename)) {
                                 $phpPossibilities[] = $filename;
                             }
-                        } catch (\Exception $e) {}
+                        } catch (\Exception $e) {
+                        }
                     }
                 }
             }
             // Sort to get highest versions first (e.g. 9.0, 8.5, 8.4...)
-            usort($phpPossibilities, function($a, $b) {
-                if ($a === 'php') return 1;
-                if ($b === 'php') return -1;
+            usort($phpPossibilities, function ($a, $b) {
+                if ($a === 'php')
+                    return 1;
+                if ($b === 'php')
+                    return -1;
                 return version_compare(str_replace('php', '', $b), str_replace('php', '', $a));
             });
             $phpPossibilities = array_unique($phpPossibilities);
@@ -94,6 +98,9 @@ class DeployProjectJob implements ShouldQueue
                 }
             }
 
+            // Inisialisasi awal agar array_unshift di bawah tidak menyebabkan error
+            $commands = $commands ?? [];
+
             // SELF-HEALING & COMPATIBILITY PATCH
             if (!$bestPhpFound) {
                 // Try to install first (will likely fail if sudo requires password)
@@ -111,32 +118,32 @@ class DeployProjectJob implements ShouldQueue
                     }
                 }
 
-                    // If we still don't have 8.4, we MUST patch the dependencies to be 8.3-compatible
-                    if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
-                        $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
-                        
-                        // We directly modify composer.json to cap Symfony at 7.1 to avoid PHP 8.4 property hooks
-                        $composerJsonPath = $path . '/composer.json';
-                        if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
-                            $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
-                            
-                            // Force symfony components to a version that doesn't use 8.4 features
-                            $composerJson['require']['symfony/http-foundation'] = '7.1.*';
-                            $composerJson['require']['symfony/error-handler'] = '7.1.*';
-                            $composerJson['require']['symfony/console'] = '7.1.*';
-                            
-                            \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-                            
-                            $logOutput .= "> composer.json patched for PHP 8.3 compatibility.\n";
+                // If we still don't have 8.4, we MUST patch the dependencies to be 8.3-compatible
+                if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
+                    $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
 
-                            // IMPORTANT: Because we modified composer.json, we must run 'update' for these packages 
-                            // to reconcile the lock file, otherwise 'composer install' will fail.
-                            $patchUpdateCmd = [$php, $composer, 'update', 'symfony/http-foundation', 'symfony/error-handler', 'symfony/console', '--no-interaction', '--ignore-platform-reqs', '--with-all-dependencies'];
-                            
-                            // Insert this update command at the beginning of the deployment process
-                            array_unshift($commands, $patchUpdateCmd);
-                        }
-                    } else {
+                    // We directly modify composer.json to cap Symfony at 7.1 to avoid PHP 8.4 property hooks
+                    $composerJsonPath = $path . '/composer.json';
+                    if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
+                        $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
+
+                        // Force symfony components to a version that doesn't use 8.4 features
+                        $composerJson['require']['symfony/http-foundation'] = '7.1.*';
+                        $composerJson['require']['symfony/error-handler'] = '7.1.*';
+                        $composerJson['require']['symfony/console'] = '7.1.*';
+
+                        \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+                        $logOutput .= "> composer.json patched for PHP 8.3 compatibility.\n";
+
+                        // IMPORTANT: Because we modified composer.json, we must run 'update' for these packages 
+                        // to reconcile the lock file, otherwise 'composer install' will fail.
+                        $patchUpdateCmd = [$php, $composer, 'update', 'symfony/http-foundation', 'symfony/error-handler', 'symfony/console', '--no-interaction', '--ignore-platform-reqs', '--with-all-dependencies'];
+
+                        // Insert this update command at the beginning of the deployment process
+                        array_unshift($commands, $patchUpdateCmd);
+                    }
+                } else {
                     $php = '/usr/bin/php8.4';
                     $logOutput .= "> PHP 8.4 successfully installed and selected.\n";
                 }
@@ -148,7 +155,8 @@ class DeployProjectJob implements ShouldQueue
             if ($process->isSuccessful()) {
                 $composerPath = trim($process->getOutput());
                 // Use the absolute path if found
-                if ($composerPath) $composer = $composerPath;
+                if ($composerPath)
+                    $composer = $composerPath;
             } else {
                 // Secondary fallback search
                 foreach (['/usr/local/bin/composer', '/usr/bin/composer', '/opt/homebrew/bin/composer'] as $cp) {
@@ -159,23 +167,32 @@ class DeployProjectJob implements ShouldQueue
                 }
             }
 
-            $commands = [
+            $baseCommands = [
                 ['git', 'pull', 'origin', $this->project->branch],
-                // We use $php prefix ONLY if we have an absolute path to composer phar
-                // If composer is an executable, we can just run it
+                    // We use $php prefix ONLY if we have an absolute path to composer phar
+                    // If composer is an executable, we can just run it
                 (str_contains($composer, '/') ? [$php, $composer] : [$composer]),
             ];
-            
+
             // Reconstruct the composer command with its arguments
             // DIUBAH: Menggunakan 'update' alih-alih 'install' agar selalu otomatis menyamakan lock file
-            $commands[1] = array_merge($commands[1], ['update', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs']);
+            $baseCommands[1] = array_merge($baseCommands[1], ['update', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs']);
 
-            // 2. Setup .env if missing
+            // Gabungkan perintah dasar ke dalam antrean commands
+            $commands = array_merge($commands, $baseCommands);
+
+            // 2. Setup .env if missing (First Deploy Automation)
             if (!\Illuminate\Support\Facades\File::exists($path . '/.env')) {
                 $logOutput .= "> Setting up environment variables...\n";
                 if (\Illuminate\Support\Facades\File::exists($path . '/.env.example')) {
                     \Illuminate\Support\Facades\File::copy($path . '/.env.example', $path . '/.env');
                     $commands[] = [$php, 'artisan', 'key:generate'];
+
+                    // Buat file database.sqlite kosong otomatis jika belum ada (untuk mencegah error migrasi)
+                    if (!\Illuminate\Support\Facades\File::exists($path . '/database/database.sqlite')) {
+                        \Illuminate\Support\Facades\File::ensureDirectoryExists($path . '/database');
+                        \Illuminate\Support\Facades\File::put($path . '/database/database.sqlite', '');
+                    }
                 }
             }
 
@@ -184,9 +201,9 @@ class DeployProjectJob implements ShouldQueue
             $commands[] = [$php, 'artisan', 'storage:link'];
             $commands[] = [$php, 'artisan', 'optimize:clear'];
 
-            // 4. Critical Permissions (Storage & Cache)
-            $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache'];
-            $commands[] = ['sudo', 'chmod', '-R', '777', 'storage', 'bootstrap/cache'];
+            // 4. Critical Permissions (Storage & Cache & Database)
+            $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache', 'database'];
+            $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database'];
 
             $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
             $tempBinDir = $home . '/.inxops_tmp_bin';
@@ -214,9 +231,9 @@ class DeployProjectJob implements ShouldQueue
                 $logPiece = "\n> " . implode(' ', $cmd) . "\n";
                 $logPiece .= $process->getOutput();
                 $logPiece .= $process->getErrorOutput();
-                
+
                 $logOutput .= $logPiece;
-                
+
                 // Incremental Logging: Update database after each command so user can see progress
                 $this->deployment->update(['log_output' => $logOutput]);
 
