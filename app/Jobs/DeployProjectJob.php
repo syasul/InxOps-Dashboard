@@ -100,22 +100,42 @@ class DeployProjectJob implements ShouldQueue
                 }
             }
 
-            // SELF-HEALING: If we don't have 8.4+, try to install it (Ubuntu/Debian)
-            if (!$bestPhpFound && \Illuminate\Support\Facades\File::exists('/usr/bin/apt-get')) {
-                $logOutput .= "> PHP 8.4+ not found. Attempting self-healing installation...\n";
-                $installCmds = [
-                    ['sudo', '-n', 'add-apt-repository', 'ppa:ondrej/php', '-y'],
-                    ['sudo', '-n', 'apt-get', 'update', '-y'],
-                    ['sudo', '-n', 'apt-get', 'install', 'php8.4-cli', 'php8.4-common', 'php8.4-mysql', 'php8.4-xml', 'php8.4-curl', 'php8.4-mbstring', 'php8.4-zip', '-y']
-                ];
-                foreach ($installCmds as $icmd) {
-                    $iprocess = new Process($icmd);
-                    $iprocess->run();
-                    $logOutput .= implode(' ', $icmd) . "\n" . $iprocess->getOutput() . $iprocess->getErrorOutput();
+            // SELF-HEALING & COMPATIBILITY PATCH
+            if (!$bestPhpFound) {
+                // Try to install first (will likely fail if sudo requires password)
+                if (\Illuminate\Support\Facades\File::exists('/usr/bin/apt-get')) {
+                    $logOutput .= "> PHP 8.4+ not found. Attempting self-healing installation...\n";
+                    $installCmds = [
+                        ['sudo', '-n', 'add-apt-repository', 'ppa:ondrej/php', '-y'],
+                        ['sudo', '-n', 'apt-get', 'update', '-y'],
+                        ['sudo', '-n', 'apt-get', 'install', 'php8.4-cli', 'php8.4-common', 'php8.4-mysql', 'php8.4-xml', 'php8.4-curl', 'php8.4-mbstring', 'php8.4-zip', '-y']
+                    ];
+                    foreach ($installCmds as $icmd) {
+                        $iprocess = new Process($icmd);
+                        $iprocess->run();
+                        $logOutput .= "\n> " . implode(' ', $icmd) . "\n" . $iprocess->getErrorOutput();
+                    }
                 }
-                
-                // Re-check after installation
-                if (\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
+
+                // If we still don't have 8.4, we MUST patch the dependencies to be 8.3-compatible
+                if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
+                    $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
+                    
+                    // We directly modify composer.json to cap Symfony at 7.1 to avoid PHP 8.4 property hooks
+                    $composerJsonPath = $path . '/composer.json';
+                    if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
+                        $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
+                        
+                        // Force symfony components to a version that doesn't use 8.4 features
+                        $composerJson['require']['symfony/http-foundation'] = '7.1.*';
+                        $composerJson['require']['symfony/error-handler'] = '7.1.*';
+                        $composerJson['require']['symfony/console'] = '7.1.*';
+                        
+                        \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                        
+                        $logOutput .= "> composer.json patched for PHP 8.3 compatibility.\n";
+                    }
+                } else {
                     $php = '/usr/bin/php8.4';
                     $logOutput .= "> PHP 8.4 successfully installed and selected.\n";
                 }
