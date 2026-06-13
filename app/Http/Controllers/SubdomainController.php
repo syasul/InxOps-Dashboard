@@ -6,6 +6,7 @@ use App\Models\Subdomain;
 use App\Models\Project;
 use App\Services\NginxService;
 use Illuminate\Http\Request;
+use Exception;
 
 class SubdomainController extends Controller
 {
@@ -33,23 +34,39 @@ class SubdomainController extends Controller
             'subdomain_name' => 'required|string|unique:subdomains,subdomain_name|regex:/^[a-z0-9.-]+$/',
         ]);
 
-        $subdomain = Subdomain::create($validated);
+        try {
+            // Buat record di database
+            $subdomain = Subdomain::create($validated);
 
-        // 1. Generate and Save Nginx Config
-        $configPath = $this->nginx->generateConfig($subdomain);
-        $subdomain->update(['config_path' => $configPath]);
+            // 1. Generate and Save Nginx Config
+            $configPath = $this->nginx->generateConfig($subdomain);
+            $subdomain->update(['config_path' => $configPath]);
 
-        // 2. Automate Enable & Reload Nginx
-        $this->nginx->enableConfig($subdomain);
+            // 2. Automate Enable & Reload Nginx
+            $this->nginx->enableConfig($subdomain);
 
-        // 3. Register DNS with Cloudflare
-        $this->cloudflare->registerDns($subdomain->subdomain_name);
+            // 3. Register DNS with Cloudflare
+            $this->cloudflare->registerDns($subdomain->subdomain_name);
 
-        return back()->with('success', 'Subdomain live! Nginx enabled and Cloudflare DNS registered.');
+            return back()->with('success', 'Subdomain live! Nginx enabled and Cloudflare DNS registered.');
+
+        } catch (Exception $e) {
+            // Jika sistem Nginx gagal, hapus record dari database agar tidak nyangkut
+            if (isset($subdomain)) {
+                $subdomain->delete();
+            }
+            return back()->with('error', 'Sistem Nginx Gagal: ' . $e->getMessage());
+        }
     }
 
     public function destroy(Subdomain $subdomain)
     {
+        try {
+            $this->nginx->removeConfig($subdomain);
+        } catch (\Exception $e) {
+            // Abaikan jika file memang sudah tidak ada
+        }
+
         $subdomain->delete();
         return back()->with('success', 'Subdomain removed.');
     }

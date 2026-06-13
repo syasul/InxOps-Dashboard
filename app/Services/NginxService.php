@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Subdomain;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
+use Exception;
 
 class NginxService
 {
@@ -18,19 +19,21 @@ class NginxService
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $oldPath = "/etc/nginx/sites-available/{$shortName}";
 
-        // Write locally first
-        $tempPath = storage_path("nginx/{$fullDomain}.conf");
-        File::ensureDirectoryExists(storage_path("nginx"));
-        File::put($tempPath, $template);
-
         // Forced Cleanup: Remove any old potential config files to avoid conflicts
         $this->runSudo(['rm', '-f', $availablePath]);
         $this->runSudo(['rm', '-f', $oldPath]);
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$fullDomain}"]);
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
 
-        // Copy new config
-        $this->runSudo(['cp', $tempPath, $availablePath]);
+        // Menulis langsung ke /etc/nginx menggunakan sudo tee (Paling Kuat & Anti Gagal)
+        // Ini persis seperti mengetik sudo nano secara otomatis di terminal
+        $command = "echo " . escapeshellarg($template) . " | sudo tee {$availablePath} > /dev/null";
+        $process = Process::fromShellCommandline($command);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new Exception("Gagal menulis file ke /etc/nginx/sites-available: " . $process->getErrorOutput());
+        }
 
         return $availablePath;
     }
@@ -42,14 +45,34 @@ class NginxService
         $enabledPath = "/etc/nginx/sites-enabled/{$fullDomain}";
 
         // 1. Symlink with sudo
-        $this->runSudo(['ln', '-sf', $availablePath, $enabledPath]);
+        $process = Process::fromShellCommandline("sudo ln -sf {$availablePath} {$enabledPath}");
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new Exception("Gagal membuat symlink Nginx: " . $process->getErrorOutput());
+        }
 
         // 2. Reload Nginx
-        $this->reload();
+        if (!$this->reload()) {
+            throw new Exception("Gagal me-reload Nginx. Cek sintaks konfigurasi Anda.");
+        }
 
         // 3. Kita tidak perlu lagi menjalankan php artisan serve!
         // Aplikasi akan otomatis ditangani secara profesional oleh Nginx dan PHP-FPM.
         return true;
+    }
+
+    public function removeConfig(Subdomain $subdomain)
+    {
+        $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
+        $shortName = $subdomain->subdomain_name;
+
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-available/{$fullDomain}"]);
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$fullDomain}"]);
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-available/{$shortName}"]);
+        $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
+
+        $this->reload();
     }
 
     public function startApplication($project)
