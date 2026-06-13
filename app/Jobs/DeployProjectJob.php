@@ -56,33 +56,55 @@ class DeployProjectJob implements ShouldQueue
 
             // Path to PHP and Composer
             $php = PHP_BINARY;
-            
-            // On some servers, PHP_BINARY might point to an older version (like 8.3)
-            // while a newer version is available. Let's try to detect newer ones.
-            $phpVersions = ['php', 'php8.4', 'php8.5', 'php9.0'];
-            foreach ($phpVersions as $version) {
-                // We'll check if these exist in standard paths
-                $checkPaths = ['/usr/bin/' . $version, '/usr/local/bin/' . $version, '/opt/homebrew/bin/' . $version];
-                foreach ($checkPaths as $cp) {
-                    if (\Illuminate\Support\Facades\File::exists($cp)) {
-                        $php = $cp;
-                        // If we find 8.4 or higher, we're good
-                        if (preg_match('/8.[4-9]|9.[0-9]/', $version)) break 2;
+            $composer = 'composer';
+
+            // 1. Try to find the best PHP version (prefer 8.4+)
+            $phpPossibilities = ['php9.0', 'php8.5', 'php8.4', 'php'];
+            $foundPhp = false;
+            foreach ($phpPossibilities as $p) {
+                $process = new Process(['which', $p]);
+                $process->run();
+                if ($process->isSuccessful()) {
+                    $candidate = trim($process->getOutput());
+                    if ($candidate) {
+                        // If it's just 'php', check version
+                        if ($p === 'php') {
+                            $vProcess = new Process([$candidate, '-r', 'echo PHP_VERSION;']);
+                            $vProcess->run();
+                            if ($vProcess->isSuccessful() && version_compare(trim($vProcess->getOutput()), '8.4.0', '>=')) {
+                                $php = $candidate;
+                                $foundPhp = true;
+                                break;
+                            }
+                        } else {
+                            $php = $candidate;
+                            $foundPhp = true;
+                            break;
+                        }
                     }
                 }
             }
 
-            // Find Composer
-            $composer = 'composer';
-            $composerPaths = [
-                '/opt/homebrew/bin/composer',
-                '/usr/local/bin/composer',
-                '/usr/bin/composer'
-            ];
-            foreach ($composerPaths as $cp) {
-                if (\Illuminate\Support\Facades\File::exists($cp)) {
-                    $composer = $cp;
-                    break;
+            // 2. Try to find Composer
+            $process = new Process(['which', 'composer']);
+            $process->run();
+            if ($process->isSuccessful()) {
+                $composer = trim($process->getOutput());
+            } else {
+                // Manual fallback search
+                $composerPaths = [
+                    '/usr/local/bin/composer',
+                    '/opt/homebrew/bin/composer',
+                    '/usr/bin/composer',
+                    '/usr/local/share/composer/composer.phar',
+                    '/usr/share/composer/composer.phar',
+                    '/home/inxdvi/bin/composer'
+                ];
+                foreach ($composerPaths as $cp) {
+                    if (\Illuminate\Support\Facades\File::exists($cp)) {
+                        $composer = $cp;
+                        break;
+                    }
                 }
             }
 
