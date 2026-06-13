@@ -19,20 +19,20 @@ class NginxService
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $oldPath = "/etc/nginx/sites-available/{$shortName}";
 
-        // Forced Cleanup: Remove any old potential config files to avoid conflicts
+        // Bersihkan file lama jika ada
         $this->runSudo(['rm', '-f', $availablePath]);
         $this->runSudo(['rm', '-f', $oldPath]);
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$fullDomain}"]);
         $this->runSudo(['rm', '-f', "/etc/nginx/sites-enabled/{$shortName}"]);
 
-        // Menulis langsung ke /etc/nginx menggunakan sudo tee (Paling Kuat & Anti Gagal)
-        // Ini persis seperti mengetik sudo nano secara otomatis di terminal
-        $command = "echo " . escapeshellarg($template) . " | sudo tee {$availablePath} > /dev/null";
-        $process = Process::fromShellCommandline($command);
+        // Solusi Paling Tangguh: Memasukkan template lewat Input Stream (stdin)
+        // Bypass semua masalah karakter khusus dan multi-line di terminal
+        $process = new Process(['sudo', 'tee', $availablePath]);
+        $process->setInput($template);
         $process->run();
 
         if (!$process->isSuccessful()) {
-            throw new Exception("Gagal menulis file ke /etc/nginx/sites-available: " . $process->getErrorOutput());
+            throw new Exception("Gagal menulis file Nginx: " . $process->getErrorOutput());
         }
 
         return $availablePath;
@@ -44,21 +44,19 @@ class NginxService
         $availablePath = "/etc/nginx/sites-available/{$fullDomain}";
         $enabledPath = "/etc/nginx/sites-enabled/{$fullDomain}";
 
-        // 1. Symlink with sudo
-        $process = Process::fromShellCommandline("sudo ln -sf {$availablePath} {$enabledPath}");
+        // Menggunakan array untuk menghindari masalah pembacaan shell
+        $process = new Process(['sudo', 'ln', '-sf', $availablePath, $enabledPath]);
         $process->run();
 
         if (!$process->isSuccessful()) {
             throw new Exception("Gagal membuat symlink Nginx: " . $process->getErrorOutput());
         }
 
-        // 2. Reload Nginx
+        // Reload Nginx
         if (!$this->reload()) {
             throw new Exception("Gagal me-reload Nginx. Cek sintaks konfigurasi Anda.");
         }
 
-        // 3. Kita tidak perlu lagi menjalankan php artisan serve!
-        // Aplikasi akan otomatis ditangani secara profesional oleh Nginx dan PHP-FPM.
         return true;
     }
 
@@ -77,24 +75,18 @@ class NginxService
 
     public function startApplication($project)
     {
-        // FUNGSI INI DIBIARKAN KOSONG NAMUN TETAP ADA (RETURN TRUE)
-        // Agar script lain di InxOps Dashboard yang memanggil fungsi ini tidak error.
-        // Mesin Nginx FPM tidak butuh proses port manual.
         return true;
     }
 
     protected function getTemplate($domain, $project)
     {
-        // Mengambil path dasar project
         $path = $project->normalized_path ?? $project->directory_path;
 
-        // Expand tilde (~) ke absolute home directory server Anda
         if (str_starts_with($path, '~')) {
             $home = env('HOME', $_SERVER['HOME'] ?? '/home/inxdvi');
             $path = str_replace('~', $home, $path);
         }
 
-        // Tentukan folder "public" tempat file index.php Laravel berada
         $root = rtrim($path, '/') . '/public';
 
         return $this->fpmTemplate($domain, $root);
@@ -102,7 +94,6 @@ class NginxService
 
     protected function fpmTemplate($domain, $root)
     {
-        // Template standar Nginx Laravel (Bebas Error 502/522, mendukung banyak pengunjung)
         return "server {
     listen 80;
     server_name {$domain};
@@ -143,7 +134,6 @@ class NginxService
 
     public function reload()
     {
-        // Try systemctl first, fallback to nginx -s reload
         if ($this->runSudo(['systemctl', 'reload', 'nginx'])) {
             return true;
         }
