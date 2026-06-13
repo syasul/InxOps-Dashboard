@@ -70,9 +70,9 @@ class NginxService
         $command = "cd {$path} && nohup php artisan serve --port={$port} > /dev/null 2>&1 &";
         
         $process = Process::fromShellCommandline($command);
-        $process->run();
+        $process->start();
         
-        return $process->isSuccessful();
+        return true;
     }
 
     protected function getTemplate($domain, $project)
