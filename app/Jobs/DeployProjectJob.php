@@ -122,7 +122,6 @@ class DeployProjectJob implements ShouldQueue
                         $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
                         $composerJson['require']['symfony/http-foundation'] = '7.1.*';
                         $composerJson['require']['symfony/error-handler'] = '7.1.*';
-                        $composerJson['require']['symfony/error-handler'] = '7.1.*';
                         $composerJson['require']['symfony/console'] = '7.1.*';
 
                         \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
@@ -150,6 +149,32 @@ class DeployProjectJob implements ShouldQueue
                         $composer = $cp;
                         break;
                     }
+                }
+            }
+
+            // === BEDAH JANTUNG COMPOSER.JSON ===
+            // Hapus script yang memicu error saat composer berjalan
+            $composerJsonPath = $path . '/composer.json';
+            if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
+                $logOutput .= "> Memeriksa composer.json untuk membuang script instalasi bermasalah...\n";
+                $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
+                $modified = false;
+
+                if (isset($composerJson['scripts']['post-update-cmd'])) {
+                    foreach ($composerJson['scripts']['post-update-cmd'] as $key => $scriptCommand) {
+                        if (str_contains($scriptCommand, 'boost:update') || str_contains($scriptCommand, 'boost:install')) {
+                            unset($composerJson['scripts']['post-update-cmd'][$key]);
+                            $modified = true;
+                        }
+                    }
+                    if ($modified) {
+                        $composerJson['scripts']['post-update-cmd'] = array_values($composerJson['scripts']['post-update-cmd']); // Re-index array
+                    }
+                }
+
+                if ($modified) {
+                    \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+                    $logOutput .= "> Script bawaan 'boost:update' berhasil dihapus dari composer.json untuk mencegah error build.\n";
                 }
             }
 
