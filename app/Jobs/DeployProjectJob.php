@@ -160,7 +160,7 @@ class DeployProjectJob implements ShouldQueue
             ];
 
             // Menggunakan 'update' agar otomatis menyamakan lock file di environment server
-            $baseCommands[1] = array_merge($baseCommands[1], ['update', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs']);
+            $baseCommands[1] = array_merge($baseCommands[1], ['update', '--no-interaction', '--prefer-dist', '--optimize-autoloader', '--ignore-platform-reqs', '--no-scripts']);
             $commands = array_merge($commands, $baseCommands);
 
             // Automasi Setup awal .env & SQLite jika belum ada file env-nya
