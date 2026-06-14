@@ -2,21 +2,18 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\Process\Process;
 
 class CloudflareService
 {
-    protected $apiToken;
-    protected $zoneId;
-    protected $baseUrl = 'https://api.cloudflare.com/client/v4';
-
-    public function __construct()
-    {
-        $this->apiToken = env('CLOUDFLARE_API_TOKEN');
-        $this->zoneId = env('CLOUDFLARE_ZONE_ID');
-    }
-
+    /**
+     * Otomatis mendaftarkan subdomain ke Cloudflare Tunnel via CLI cloudflared.
+     *
+     * @param string $subdomainName
+     * @param string|null $content
+     * @return bool
+     */
     public function registerDns($subdomainName, $content = null)
     {
         if (!filter_var(env('CLOUDFLARE_ENABLED', true), FILTER_VALIDATE_BOOLEAN)) {
@@ -24,45 +21,29 @@ class CloudflareService
             return true;
         }
 
-        if (!$this->apiToken || !$this->zoneId) {
-            Log::warning('Cloudflare API Token or Zone ID missing in .env');
-            return false;
-        }
-
-        $type = env('CLOUDFLARE_DNS_TYPE', 'A');
-        
-        if ($type === 'CNAME') {
-            $content = $content ?: env('CLOUDFLARE_DNS_CONTENT', 'dashboard.inxdvi.com');
-        } else {
-            $content = $content ?: $this->getServerIp();
-        }
-
         $fullDomain = $subdomainName . '.inxdvi.com';
+        $tunnelName = env('CLOUDFLARE_TUNNEL_NAME', 'inxdvi.tunnel');
 
-        $response = Http::withToken($this->apiToken)
-            ->post("{$this->baseUrl}/zones/{$this->zoneId}/dns_records", [
-                'type' => $type,
-                'name' => $fullDomain,
-                'content' => $content,
-                'ttl' => 1, // Auto
-                'proxied' => true,
-            ]);
+        Log::info("Menambahkan route DNS ke Cloudflare Tunnel: {$fullDomain} -> {$tunnelName}");
 
-        if ($response->successful()) {
-            Log::info("DNS registered for {$fullDomain} (Type: {$type}) pointing to {$content}");
+        // Mengeksekusi perintah CLI cloudflared untuk routing DNS otomatis
+        $process = new Process(['cloudflared', 'tunnel', 'route', 'dns', $tunnelName, $fullDomain]);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            Log::info("Sukses! DNS {$fullDomain} berhasil di-route ke tunnel.");
             return true;
         }
 
-        Log::error("Cloudflare DNS error: " . $response->body());
-        return false;
-    }
+        $error = $process->getErrorOutput();
 
-    protected function getServerIp()
-    {
-        try {
-            return trim(file_get_contents('https://api.ipify.org'));
-        } catch (\Exception $e) {
-            return '127.0.0.1'; // Fallback
+        // Self-healing: Jika error karena record sudah ada, anggap sukses agar proses deploy tetap jalan
+        if (str_contains($error, 'already exists') || str_contains($error, '1003')) {
+            Log::info("DNS {$fullDomain} sudah terdaftar sebelumnya di Cloudflare. Melanjutkan proses...");
+            return true;
         }
+
+        Log::error("Gagal melakukan routing DNS Cloudflare: " . $error);
+        return false;
     }
 }
