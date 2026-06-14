@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Subdomain;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use Exception;
 
@@ -11,6 +12,10 @@ class NginxService
 {
     public function generateConfig(Subdomain $subdomain)
     {
+        // === TAMBAHAN OTOMATISASI SANDBOX ===
+        // Pastikan PHP 8.4 memiliki izin tulis ke /etc/nginx sebelum melakukan apapun
+        $this->unlockFpmSandbox();
+
         $project = $subdomain->project;
         $fullDomain = $subdomain->subdomain_name . '.inxdvi.com';
         $shortName = $subdomain->subdomain_name;
@@ -163,5 +168,45 @@ class NginxService
             return true;
         }
         return $this->runSudo(['nginx', '-s', 'reload']);
+    }
+
+    /**
+     * Membuka kunci (Sandbox) Systemd pada PHP-FPM agar bisa mengedit file Nginx di /etc.
+     * Dikhususkan untuk standar InxOps (PHP 8.4).
+     */
+    protected function unlockFpmSandbox()
+    {
+        $overrideDir = '/etc/systemd/system/php8.4-fpm.service.d';
+        $overrideFile = $overrideDir . '/override.conf';
+
+        // Jika file override sudah ada, lewati proses ini (agar tidak restart FPM terus-menerus)
+        if (File::exists($overrideFile)) {
+            return true;
+        }
+
+        Log::info("Membuka kunci Sandbox Read-Only untuk PHP 8.4 FPM...");
+
+        // 1. Buat foldernya
+        $this->runSudo(['mkdir', '-p', $overrideDir]);
+
+        // 2. Tulis file konfigurasi override
+        $content = "[Service]\nProtectSystem=false\nReadWritePaths=/etc/nginx\n";
+        $process = new Process(['sudo', 'tee', $overrideFile]);
+        $process->setInput($content);
+        $process->run();
+
+        if ($process->isSuccessful()) {
+            // 3. Reload systemd dan restart FPM
+            $this->runSudo(['systemctl', 'daemon-reload']);
+
+            // Catatan: Proses ini akan me-restart PHP-FPM. 
+            // Karena command dijalankan di background, request saat ini mungkin akan sedikit ter-delay.
+            $this->runSudo(['systemctl', 'restart', 'php8.4-fpm']);
+
+            Log::info("Sandbox berhasil dibuka. PHP 8.4 FPM telah di-restart.");
+            return true;
+        }
+
+        throw new Exception("Gagal membuka Sandbox PHP-FPM: " . $process->getErrorOutput());
     }
 }
