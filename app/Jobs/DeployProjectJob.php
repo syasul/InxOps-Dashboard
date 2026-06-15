@@ -173,7 +173,6 @@ class DeployProjectJob implements ShouldQueue
             $commands = array_merge($commands, $baseCommands);
 
             // --- FASE 2: BUAT FILE .ENV DAN DATABASE ---
-            // Kita harus membuat filenya dulu agar nanti bisa di-chmod tanpa pesan error "No such file"
             $envPath = $path . '/.env';
             if (!\Illuminate\Support\Facades\File::exists($envPath)) {
                 $logOutput .= "> Membuat dan mengonfigurasi otomatis file .env ke mode SQLite...\n";
@@ -184,6 +183,11 @@ class DeployProjectJob implements ShouldQueue
                     $envContent = preg_replace('/^DB_CONNECTION=.*$/m', 'DB_CONNECTION=sqlite', $envContent);
                     // Nonaktifkan konfigurasi MySQL dengan memberikan komentar (#)
                     $envContent = preg_replace('/^(DB_HOST|DB_PORT|DB_DATABASE|DB_USERNAME|DB_PASSWORD)=/m', '#$0', $envContent);
+
+                    // FIX: Paksa tambahkan variabel APP_KEY= jika belum ada di file template
+                    if (!preg_match('/^APP_KEY=/m', $envContent)) {
+                        $envContent .= "\nAPP_KEY=\n";
+                    }
 
                     \Illuminate\Support\Facades\File::put($envPath, $envContent);
                 }
@@ -202,14 +206,14 @@ class DeployProjectJob implements ShouldQueue
             }
 
             // --- FASE 3: AMBIL ALIH HAK AKSES TOTAL ---
-            // Perbaikan hak akses WAJIB dilakukan sebelum Artisan menyentuh database dan env
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', '.'];
             $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', '.env'];
 
-            // --- FASE 4: ARTISAN (Aman dari Permission Denied) ---
+            // --- FASE 4: ARTISAN (Urutan Diperbaiki) ---
             $commands[] = [$php, 'artisan', 'key:generate'];
-            $commands[] = [$php, 'artisan', 'optimize:clear'];
+            // FIX: Migrate HARUS jalan lebih dulu agar tabel cache Laravel 11 terbentuk!
             $commands[] = [$php, 'artisan', 'migrate', '--force'];
+            $commands[] = [$php, 'artisan', 'optimize:clear'];
             $commands[] = [$php, 'artisan', 'storage:link'];
 
             // --- FASE 5: FRONTEND BUILD ---
@@ -227,7 +231,6 @@ class DeployProjectJob implements ShouldQueue
 
             // --- FASE 6: RESTART QUEUE & IZIN FINAL ---
             $commands[] = [$php, 'artisan', 'queue:restart'];
-            // Memastikan ulang agar Nginx tetap bisa membaca public dan assets
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache', 'database', 'public'];
             $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', 'public'];
 
