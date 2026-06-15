@@ -66,17 +66,14 @@ class DeployProjectJob implements ShouldQueue
                             if (preg_match('/^php[89]\.[0-9]+$/', $filename)) {
                                 $phpPossibilities[] = $filename;
                             }
-                        } catch (\Exception $e) {
-                        }
+                        } catch (\Exception $e) {}
                     }
                 }
             }
 
             usort($phpPossibilities, function ($a, $b) {
-                if ($a === 'php')
-                    return 1;
-                if ($b === 'php')
-                    return -1;
+                if ($a === 'php') return 1;
+                if ($b === 'php') return -1;
                 return version_compare(str_replace('php', '', $b), str_replace('php', '', $a));
             });
             $phpPossibilities = array_unique($phpPossibilities);
@@ -116,7 +113,6 @@ class DeployProjectJob implements ShouldQueue
                 }
 
                 if (!\Illuminate\Support\Facades\File::exists('/usr/bin/php8.4')) {
-                    $logOutput .= "\n> Applying COMPATIBILITY PATCH: Forcing Symfony 7.1 (PHP 8.3 compatible)...\n";
                     $composerJsonPath = $path . '/composer.json';
                     if (\Illuminate\Support\Facades\File::exists($composerJsonPath)) {
                         $composerJson = json_decode(\Illuminate\Support\Facades\File::get($composerJsonPath), true);
@@ -125,7 +121,7 @@ class DeployProjectJob implements ShouldQueue
                         $composerJson['require']['symfony/console'] = '7.1.*';
 
                         \Illuminate\Support\Facades\File::put($composerJsonPath, json_encode($composerJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-
+                        
                         $patchUpdateCmd = [$php, $composer, 'update', 'symfony/http-foundation', 'symfony/error-handler', 'symfony/console', '--no-interaction', '--ignore-platform-reqs', '--with-all-dependencies'];
                         array_unshift($commands, $patchUpdateCmd);
                     }
@@ -139,14 +135,10 @@ class DeployProjectJob implements ShouldQueue
             $process->run();
             if ($process->isSuccessful()) {
                 $composerPath = trim($process->getOutput());
-                if ($composerPath)
-                    $composer = $composerPath;
+                if ($composerPath) $composer = $composerPath;
             } else {
                 foreach (['/usr/local/bin/composer', '/usr/bin/composer', '/opt/homebrew/bin/composer'] as $cp) {
-                    if (\Illuminate\Support\Facades\File::exists($cp)) {
-                        $composer = $cp;
-                        break;
-                    }
+                    if (\Illuminate\Support\Facades\File::exists($cp)) { $composer = $cp; break; }
                 }
             }
 
@@ -164,7 +156,7 @@ class DeployProjectJob implements ShouldQueue
                         }
                     }
                     if ($modified) {
-                        $composerJson['scripts']['post-update-cmd'] = array_values($composerJson['scripts']['post-update-cmd']);
+                        $composerJson['scripts']['post-update-cmd'] = array_values($composerJson['scripts']['post-update-cmd']); 
                     }
                 }
 
@@ -180,12 +172,8 @@ class DeployProjectJob implements ShouldQueue
             ];
             $commands = array_merge($commands, $baseCommands);
 
-            // --- FASE 2: PERBAIKI IZIN FOLDER AWAL ---
-            // Dilakukan sebelum Artisan jalan agar log dan .env tidak Permission Denied
-            $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', $path];
-            $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache'];
-
-            // --- FASE 3: OTOMATISASI SQLITE & APP_KEY ---
+            // --- FASE 2: BUAT FILE .ENV DAN DATABASE ---
+            // Kita harus membuat filenya dulu agar nanti bisa di-chmod tanpa pesan error "No such file"
             $envPath = $path . '/.env';
             if (!\Illuminate\Support\Facades\File::exists($envPath)) {
                 $logOutput .= "> Membuat dan mengonfigurasi otomatis file .env ke mode SQLite...\n";
@@ -201,10 +189,9 @@ class DeployProjectJob implements ShouldQueue
                 }
             }
 
-            // Pastikan database SQLite selalu ada dan APP_KEY di-generate
+            // Pastikan database SQLite selalu ada
             if (\Illuminate\Support\Facades\File::exists($envPath)) {
                 $envContent = \Illuminate\Support\Facades\File::get($envPath);
-
                 if (str_contains($envContent, 'DB_CONNECTION=sqlite')) {
                     \Illuminate\Support\Facades\File::ensureDirectoryExists($path . '/database');
                     if (!\Illuminate\Support\Facades\File::exists($path . '/database/database.sqlite')) {
@@ -212,13 +199,16 @@ class DeployProjectJob implements ShouldQueue
                         $logOutput .= "> File database.sqlite berhasil dibuat otomatis.\n";
                     }
                 }
-
-                if (!str_contains($envContent, 'APP_KEY=base64:')) {
-                    $commands[] = [$php, 'artisan', 'key:generate'];
-                }
             }
 
-            // --- FASE 4: ARTISAN & DATABASE ---
+            // --- FASE 3: AMBIL ALIH HAK AKSES TOTAL ---
+            // Perbaikan hak akses WAJIB dilakukan sebelum Artisan menyentuh database dan env
+            $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', '.'];
+            $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', '.env'];
+
+            // --- FASE 4: ARTISAN (Aman dari Permission Denied) ---
+            $commands[] = [$php, 'artisan', 'key:generate'];
+            $commands[] = [$php, 'artisan', 'optimize:clear'];
             $commands[] = [$php, 'artisan', 'migrate', '--force'];
             $commands[] = [$php, 'artisan', 'storage:link'];
 
@@ -235,12 +225,9 @@ class DeployProjectJob implements ShouldQueue
                 $commands[] = [$npm, 'run', 'build'];
             }
 
-            // --- FASE 6: OPTIMASI & RESTART QUEUE ---
-            $commands[] = [$php, 'artisan', 'optimize:clear'];
+            // --- FASE 6: RESTART QUEUE & IZIN FINAL ---
             $commands[] = [$php, 'artisan', 'queue:restart'];
-
-            // --- FASE 7: PERBAIKAN IZIN FINAL ---
-            // Memastikan file log, sqlite, dan cache baru bisa ditulis oleh Nginx
+            // Memastikan ulang agar Nginx tetap bisa membaca public dan assets
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache', 'database', 'public'];
             $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', 'public'];
 
