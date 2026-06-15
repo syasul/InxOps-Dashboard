@@ -173,6 +173,7 @@ class DeployProjectJob implements ShouldQueue
             $commands = array_merge($commands, $baseCommands);
 
             // --- FASE 2: BUAT FILE .ENV DAN DATABASE ---
+            // Kita harus membuat filenya dulu agar nanti bisa di-chmod tanpa pesan error "No such file"
             $envPath = $path . '/.env';
             if (!\Illuminate\Support\Facades\File::exists($envPath)) {
                 $logOutput .= "> Membuat dan mengonfigurasi otomatis file .env ke mode SQLite...\n";
@@ -206,12 +207,12 @@ class DeployProjectJob implements ShouldQueue
             }
 
             // --- FASE 3: AMBIL ALIH HAK AKSES TOTAL ---
+            // Perbaikan hak akses WAJIB dilakukan sebelum Artisan menyentuh database dan env
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', '.'];
             $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', '.env'];
 
-            // --- FASE 4: ARTISAN (Urutan Diperbaiki) ---
+            // --- FASE 4: ARTISAN (Aman dari Permission Denied) ---
             $commands[] = [$php, 'artisan', 'key:generate'];
-            // FIX: Migrate HARUS jalan lebih dulu agar tabel cache Laravel 11 terbentuk!
             $commands[] = [$php, 'artisan', 'migrate', '--force'];
             $commands[] = [$php, 'artisan', 'optimize:clear'];
             $commands[] = [$php, 'artisan', 'storage:link'];
@@ -231,6 +232,7 @@ class DeployProjectJob implements ShouldQueue
 
             // --- FASE 6: RESTART QUEUE & IZIN FINAL ---
             $commands[] = [$php, 'artisan', 'queue:restart'];
+            // Memastikan ulang agar Nginx tetap bisa membaca public dan assets
             $commands[] = ['sudo', 'chown', '-R', 'inxdvi:www-data', 'storage', 'bootstrap/cache', 'database', 'public'];
             $commands[] = ['sudo', 'chmod', '-R', '775', 'storage', 'bootstrap/cache', 'database', 'public'];
 
@@ -254,6 +256,7 @@ class DeployProjectJob implements ShouldQueue
                     'HOME' => $home,
                     'COMPOSER_HOME' => $home . '/.composer',
                     'PATH' => $tempBinDir . ':/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin',
+                    'NODE_OPTIONS' => '--dns-result-order=ipv4first' // FIX: Memaksa Node menggunakan IPv4 agar tidak ETIMEDOUT
                 ]);
                 $process->setTimeout(300);
                 $process->run();
