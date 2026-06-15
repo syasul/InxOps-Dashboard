@@ -26,13 +26,11 @@ class CloudflareService
 
         Log::info("Menambahkan route DNS ke Cloudflare Tunnel: {$fullDomain} -> {$tunnelName}");
 
-        // === KUNCI UTAMA PERBAIKAN ===
-        // Mengeksekusi perintah CLI cloudflared untuk routing DNS otomatis.
-        // Menggunakan 'sudo -u inxdvi' agar PHP mengeksekusi perintah ini
-        // menggunakan sertifikat login Cloudflare milik user inxdvi.
+        // === KUNCI PERBAIKAN ===
+        // Karena KTP Cloudflare sekarang ada di folder global /etc/cloudflared/ (milik root),
+        // kita langsung tembak menggunakan 'sudo' tanpa '-u inxdvi'
         $process = new Process([
-            'sudo', '-u', 'inxdvi', 
-            'cloudflared', 'tunnel', 'route', 'dns', 
+            'sudo', 'cloudflared', 'tunnel', 'route', 'dns', 
             $tunnelName, $fullDomain
         ]);
         
